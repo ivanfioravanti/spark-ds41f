@@ -59,5 +59,7 @@
   },
   "serving_operations": [],
   "dgx_hold_modified": false,
-  "authorization": "Owner: Yes, use sp8 independently; leaves foreign DGX hold untouched."
+  "authorization": "Owner: Yes, use sp8 independently; leaves foreign DGX hold untouched.",
+  "cpu_builder_cleanup": "Stopped and removed only tilelang-review-build-20261104 after all CPU checks; source, libraries and receipts retained.",
+  "request_helper_commit": "e266589b1c59259bf08a3c332d3dc245a432077b"
 }
