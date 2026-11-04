@@ -38,6 +38,9 @@ def main():
     hold = Path.home() / "spark-hold.json"
     if hold.exists():
         raise SystemExit("sp8 has an existing hold: " + hold.read_text())
+    request = Path.home() / "spark-request.json"
+    if request.exists() and json.loads(request.read_text()).get("who") == HOLDER:
+        request.unlink()
     processes = subprocess.check_output(
         ["nvidia-smi", "--query-compute-apps=pid,process_name", "--format=csv,noheader"], text=True
     ).strip()
