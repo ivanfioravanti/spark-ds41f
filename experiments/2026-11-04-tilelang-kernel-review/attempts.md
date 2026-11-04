@@ -23,3 +23,12 @@ error, not an upstream result. Its diff and failing receipts are preserved.
 The first GPU matrix attempt refused the busy local GPU lock, before launching
 any test. Another sp8 diagnostic held the node. The reservation/request protocol
 was followed; no foreign hold was changed.
+
+The first GPU batch yielded at a test boundary when another request arrived.
+Its waiting resume process then deferred to that hold and the older request.
+After the prior holder released the node, the request file remained while no
+reservation or GPU process was present for several minutes. Under the GPU
+lock, only our waiting process was replaced. The final short batch preserved
+that old request, honored any new or changed request, and completed the 17
+remaining processes. `queue-transition.json` and `completion.json` record the
+transition and cleanup. No foreign request or hold was removed or overwritten.

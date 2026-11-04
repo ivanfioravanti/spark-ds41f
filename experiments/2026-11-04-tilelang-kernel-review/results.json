@@ -1500,6 +1500,572 @@
         }
       }
     },
+    "clamp-edges-a": {
+      "label": "clamp-edges-a",
+      "started_utc": "2026-11-04T02:01:09.135641+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/pr3605",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-clamp-edges-a",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/clamp-edges-a,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/clamp-edges-a,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/pr3605",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "180",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp-edges"
+      ],
+      "before_memory_bytes": 123480453120,
+      "start_hottest_c": 49.0,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:01:18.145279+00:00",
+      "memory_aborted": false,
+      "output_sha256": "7af0c0294eb155c1a1090f58c72d389cb2215c0629e1ec326ac1b73db6749210",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "float32",
+          "status": "passed",
+          "details": {
+            "input_bits": [
+              2143363909,
+              4291117857,
+              2141266757,
+              4288750405,
+              1,
+              2147483649,
+              8388607,
+              2155872255,
+              0,
+              2147483648,
+              2139095040,
+              4286578688,
+              1088421888,
+              3235905536,
+              1090519040,
+              3238002688
+            ],
+            "compare_select_bits": [
+              2143363909,
+              4291117857,
+              2141266757,
+              4288750405,
+              1,
+              2147483649,
+              8388607,
+              2155872255,
+              0,
+              2147483648,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536
+            ],
+            "symmetric_bits": [
+              2147483647,
+              2147483647,
+              2147483647,
+              2147483647,
+              1,
+              2147483649,
+              8388607,
+              2155872255,
+              0,
+              2147483648,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536
+            ],
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "nan_output_bits_equal": false,
+            "old_preserves_input_nan_bits": true,
+            "new_preserves_input_nan_bits": false
+          }
+        },
+        {
+          "name": "float16",
+          "status": "passed",
+          "details": {
+            "input_bits": [
+              32289,
+              65057,
+              32033,
+              64801,
+              1,
+              32769,
+              1023,
+              33791,
+              0,
+              32768,
+              31744,
+              64512,
+              18176,
+              50944,
+              18432,
+              51200
+            ],
+            "compare_select_bits": [
+              32289,
+              65057,
+              32033,
+              64801,
+              1,
+              32769,
+              1023,
+              33791,
+              0,
+              32768,
+              18176,
+              50944,
+              18176,
+              50944,
+              18176,
+              50944
+            ],
+            "symmetric_bits": [
+              32767,
+              32767,
+              32767,
+              32767,
+              1,
+              32769,
+              1023,
+              33791,
+              0,
+              32768,
+              18176,
+              50944,
+              18176,
+              50944,
+              18176,
+              50944
+            ],
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "nan_output_bits_equal": false,
+            "old_preserves_input_nan_bits": true,
+            "new_preserves_input_nan_bits": false
+          }
+        },
+        {
+          "name": "bfloat16",
+          "status": "passed",
+          "details": {
+            "input_bits": [
+              32705,
+              65473,
+              32673,
+              65441,
+              1,
+              32769,
+              127,
+              32895,
+              0,
+              32768,
+              32640,
+              65408,
+              16608,
+              49376,
+              16640,
+              49408
+            ],
+            "compare_select_bits": [
+              32705,
+              65473,
+              32673,
+              65441,
+              1,
+              32769,
+              127,
+              32895,
+              0,
+              32768,
+              16608,
+              49376,
+              16608,
+              49376,
+              16608,
+              49376
+            ],
+            "symmetric_bits": [
+              32767,
+              32767,
+              32767,
+              32767,
+              1,
+              32769,
+              127,
+              32895,
+              0,
+              32768,
+              16608,
+              49376,
+              16608,
+              49376,
+              16608,
+              49376
+            ],
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "nan_output_bits_equal": false,
+            "old_preserves_input_nan_bits": true,
+            "new_preserves_input_nan_bits": false
+          }
+        }
+      ],
+      "min_host_available_bytes": 121892859904,
+      "max_hottest_c": 54.2,
+      "files": {
+        "command.json": {
+          "bytes": 1543,
+          "sha256": "463f11e923cfac076b98c26121d4a8ad60976bf5ebc42070a1f3364dfde9d355"
+        },
+        "memory.jsonl": {
+          "bytes": 864,
+          "sha256": "7d7b14f60f5523b1e5817414ed8589f017fab865c0424140f76b49b99f2e9bbb"
+        },
+        "output.txt": {
+          "bytes": 3684,
+          "sha256": "7af0c0294eb155c1a1090f58c72d389cb2215c0629e1ec326ac1b73db6749210"
+        },
+        "result.json": {
+          "bytes": 1726,
+          "sha256": "1e05ea0ef8f0bf4159cbeb476caaff4c9944e0a31c74ac028d466610ea44369c"
+        },
+        "standalone.json": {
+          "bytes": 3418,
+          "sha256": "e44c7fefe2e9481c79093f2bcb3d7a575c0cf4013c422de8ed481e28ebb72424"
+        }
+      }
+    },
+    "clamp-edges-b": {
+      "label": "clamp-edges-b",
+      "started_utc": "2026-11-04T02:01:18.146568+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/pr3605",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-clamp-edges-b",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/clamp-edges-b,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/clamp-edges-b,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/pr3605",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "180",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp-edges"
+      ],
+      "before_memory_bytes": 123037216768,
+      "start_hottest_c": 48.9,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:01:27.157222+00:00",
+      "memory_aborted": false,
+      "output_sha256": "7a24c02ffca2dc01efac62723c19f8dce2a692482410de95f434d5940e1ddafa",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "float32",
+          "status": "passed",
+          "details": {
+            "input_bits": [
+              2143363909,
+              4291117857,
+              2141266757,
+              4288750405,
+              1,
+              2147483649,
+              8388607,
+              2155872255,
+              0,
+              2147483648,
+              2139095040,
+              4286578688,
+              1088421888,
+              3235905536,
+              1090519040,
+              3238002688
+            ],
+            "compare_select_bits": [
+              2143363909,
+              4291117857,
+              2141266757,
+              4288750405,
+              1,
+              2147483649,
+              8388607,
+              2155872255,
+              0,
+              2147483648,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536
+            ],
+            "symmetric_bits": [
+              2147483647,
+              2147483647,
+              2147483647,
+              2147483647,
+              1,
+              2147483649,
+              8388607,
+              2155872255,
+              0,
+              2147483648,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536,
+              1088421888,
+              3235905536
+            ],
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "nan_output_bits_equal": false,
+            "old_preserves_input_nan_bits": true,
+            "new_preserves_input_nan_bits": false
+          }
+        },
+        {
+          "name": "float16",
+          "status": "passed",
+          "details": {
+            "input_bits": [
+              32289,
+              65057,
+              32033,
+              64801,
+              1,
+              32769,
+              1023,
+              33791,
+              0,
+              32768,
+              31744,
+              64512,
+              18176,
+              50944,
+              18432,
+              51200
+            ],
+            "compare_select_bits": [
+              32289,
+              65057,
+              32033,
+              64801,
+              1,
+              32769,
+              1023,
+              33791,
+              0,
+              32768,
+              18176,
+              50944,
+              18176,
+              50944,
+              18176,
+              50944
+            ],
+            "symmetric_bits": [
+              32767,
+              32767,
+              32767,
+              32767,
+              1,
+              32769,
+              1023,
+              33791,
+              0,
+              32768,
+              18176,
+              50944,
+              18176,
+              50944,
+              18176,
+              50944
+            ],
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "nan_output_bits_equal": false,
+            "old_preserves_input_nan_bits": true,
+            "new_preserves_input_nan_bits": false
+          }
+        },
+        {
+          "name": "bfloat16",
+          "status": "passed",
+          "details": {
+            "input_bits": [
+              32705,
+              65473,
+              32673,
+              65441,
+              1,
+              32769,
+              127,
+              32895,
+              0,
+              32768,
+              32640,
+              65408,
+              16608,
+              49376,
+              16640,
+              49408
+            ],
+            "compare_select_bits": [
+              32705,
+              65473,
+              32673,
+              65441,
+              1,
+              32769,
+              127,
+              32895,
+              0,
+              32768,
+              16608,
+              49376,
+              16608,
+              49376,
+              16608,
+              49376
+            ],
+            "symmetric_bits": [
+              32767,
+              32767,
+              32767,
+              32767,
+              1,
+              32769,
+              127,
+              32895,
+              0,
+              32768,
+              16608,
+              49376,
+              16608,
+              49376,
+              16608,
+              49376
+            ],
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "nan_output_bits_equal": false,
+            "old_preserves_input_nan_bits": true,
+            "new_preserves_input_nan_bits": false
+          }
+        }
+      ],
+      "min_host_available_bytes": 121797316608,
+      "max_hottest_c": 54.0,
+      "files": {
+        "command.json": {
+          "bytes": 1543,
+          "sha256": "e71b3604ba1567909611f3368438dd79e55ecaed11fc88fd410009516bf91d9a"
+        },
+        "memory.jsonl": {
+          "bytes": 864,
+          "sha256": "2a510245c173f13929d888463fcbe0f621f8d0b99236850b67fb639908daa4c1"
+        },
+        "output.txt": {
+          "bytes": 3684,
+          "sha256": "7a24c02ffca2dc01efac62723c19f8dce2a692482410de95f434d5940e1ddafa"
+        },
+        "result.json": {
+          "bytes": 1726,
+          "sha256": "9e62ff4e6c35302c2d557a799d02cb253580f282f6c07535800c69a114e7f185"
+        },
+        "standalone.json": {
+          "bytes": 3418,
+          "sha256": "e44c7fefe2e9481c79093f2bcb3d7a575c0cf4013c422de8ed481e28ebb72424"
+        }
+      }
+    },
     "clamp-pr3605-a-v2": {
       "label": "clamp-pr3605-a-v2",
       "started_utc": "2026-11-04T01:38:29.884201+00:00",
@@ -1717,6 +2283,226 @@
         "standalone.json": {
           "bytes": 3140,
           "sha256": "ac3c253d985b0d187fbfba228f2439aa221388402130e27ad4333a1fb934ae67"
+        }
+      }
+    },
+    "clamp-pr3605-b-v2": {
+      "label": "clamp-pr3605-b-v2",
+      "started_utc": "2026-11-04T02:00:17.047314+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/pr3605",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-clamp-pr3605-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/clamp-pr3605-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/clamp-pr3605-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/pr3605",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp"
+      ],
+      "before_memory_bytes": 123172577280,
+      "start_hottest_c": 49.6,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:26.060816+00:00",
+      "memory_aborted": false,
+      "output_sha256": "0cad5cb1c59c9a990f617911156f273472fbc5d3c1fd15d7d93e2e9acd9984b8",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "float32",
+          "status": "passed",
+          "details": {
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "signed_zero_equal": true,
+            "nan_payload_differences": 0,
+            "compare_select": {
+              "mean_us": 0.9219804406166077,
+              "ci95_us": 0.005372544491827576,
+              "samples_us": [
+                0.9393919706344604,
+                0.9236479997634888,
+                0.9203839898109436,
+                0.9172160029411316,
+                0.9206399917602539,
+                0.9211840033531189,
+                0.91839998960495,
+                0.9216319918632507,
+                0.9153280258178711
+              ]
+            },
+            "symmetric": {
+              "mean_us": 0.9589759906133016,
+              "ci95_us": 0.05677602587298123,
+              "samples_us": [
+                0.9474239945411682,
+                0.9240959882736206,
+                0.9229440093040466,
+                0.9213119745254517,
+                0.9317439794540405,
+                0.9269760251045227,
+                0.9791039824485779,
+                1.149791955947876,
+                0.9273920059204102
+              ]
+            }
+          }
+        },
+        {
+          "name": "float16",
+          "status": "passed",
+          "details": {
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "signed_zero_equal": true,
+            "nan_payload_differences": 0,
+            "compare_select": {
+              "mean_us": 0.8272533350520663,
+              "ci95_us": 0.005996116896564583,
+              "samples_us": [
+                0.8466240167617798,
+                0.8192639946937561,
+                0.8239039778709412,
+                0.8275200128555298,
+                0.8238720297813416,
+                0.8225600123405457,
+                0.8280959725379944,
+                0.8257920145988464,
+                0.8276479840278625
+              ]
+            },
+            "symmetric": {
+              "mean_us": 0.8145600093735589,
+              "ci95_us": 0.08137366883078846,
+              "samples_us": [
+                0.7917439937591553,
+                0.7677119970321655,
+                0.7675520181655884,
+                0.7663679718971252,
+                0.7700160145759583,
+                0.784063994884491,
+                0.7866880297660828,
+                0.8020480275154114,
+                1.0948480367660522
+              ]
+            }
+          }
+        },
+        {
+          "name": "bfloat16",
+          "status": "passed",
+          "details": {
+            "finite_bits_equal": true,
+            "nan_propagation_equal": true,
+            "signed_zero_equal": true,
+            "nan_payload_differences": 0,
+            "compare_select": {
+              "mean_us": 0.8231999940342374,
+              "ci95_us": 0.007273493836776595,
+              "samples_us": [
+                0.8384000062942505,
+                0.8068159818649292,
+                0.8106880187988281,
+                0.8279680013656616,
+                0.8240000009536743,
+                0.8229439854621887,
+                0.8273599743843079,
+                0.8230080008506775,
+                0.8276159763336182
+              ]
+            },
+            "symmetric": {
+              "mean_us": 0.7788942125108507,
+              "ci95_us": 0.0052686929577190796,
+              "samples_us": [
+                0.7965440154075623,
+                0.7795519828796387,
+                0.77920001745224,
+                0.7755839824676514,
+                0.7761279940605164,
+                0.775551974773407,
+                0.7777919769287109,
+                0.7750399708747864,
+                0.7746559977531433
+              ]
+            }
+          }
+        }
+      ],
+      "min_host_available_bytes": 122051219456,
+      "max_hottest_c": 54.6,
+      "files": {
+        "clamp-bfloat16.cu": {
+          "bytes": 1300,
+          "sha256": "9ccb438c7501185747ae13503fe08c6a1140fd66155b245c984fb939625fe856"
+        },
+        "clamp-float16.cu": {
+          "bytes": 1255,
+          "sha256": "21496a92e425967036e7b51faa65d55750076997843c3d5bb1114405a179f58c"
+        },
+        "clamp-float32.cu": {
+          "bytes": 1189,
+          "sha256": "dd1ab57e64dcd819ba864cc6c7c31e81f817ccd651f54fa264ca7a5761800c44"
+        },
+        "command.json": {
+          "bytes": 1553,
+          "sha256": "2d4af880205a789ebba304a16af767d7013b9f05023c55ac78b22a53d4e9cbe5"
+        },
+        "memory.jsonl": {
+          "bytes": 864,
+          "sha256": "22edad84ccd1ecc9fd8eec45a22c19d1e0bc5525ebd62779c6df16f778513aae"
+        },
+        "output.txt": {
+          "bytes": 3874,
+          "sha256": "0cad5cb1c59c9a990f617911156f273472fbc5d3c1fd15d7d93e2e9acd9984b8"
+        },
+        "result.json": {
+          "bytes": 1736,
+          "sha256": "e376ef44db89627c66ab9629b10b8e34f8c876e197effb3bc7f1bcf9bbab7e80"
+        },
+        "standalone.json": {
+          "bytes": 3140,
+          "sha256": "9ec47d823fe12466520dab12d7a6c4a5bc41131963df9b8478d2a4c11352579e"
         }
       }
     },
@@ -6420,6 +7206,114 @@
         }
       }
     },
+    "layout-inferred-tmafalse-b-v2": {
+      "label": "layout-inferred-tmafalse-b-v2",
+      "started_utc": "2026-11-04T02:00:44.092112+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-layout-inferred-tmafalse-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/layout-inferred-tmafalse-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/layout-inferred-tmafalse-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred",
+        "--disable-tma"
+      ],
+      "before_memory_bytes": 123070820352,
+      "start_hottest_c": 48.7,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:49.100554+00:00",
+      "memory_aborted": false,
+      "output_sha256": "4902380bd18019baf198afcbb769a8de082a670c957b06f3e477f9881158b323",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "inferred-tma-disabled-True",
+          "status": "passed",
+          "details": {
+            "wrong_elements": [
+              0,
+              0,
+              0
+            ],
+            "inputs": "small exact integers, seed 29",
+            "issue": 3571
+          }
+        }
+      ],
+      "min_host_available_bytes": 122139418624,
+      "max_hottest_c": 55.0,
+      "files": {
+        "command.json": {
+          "bytes": 1651,
+          "sha256": "8112d2cba21dd27ad5e33ceea961dca3329d9cdf198eaa4a35ac4e39ab5800da"
+        },
+        "layout-inferred-True.cu": {
+          "bytes": 10376,
+          "sha256": "8828c7596d7e760ba77c5d2d251b6e79ea98a559d942b1ea9eab9f2d4963bf87"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "86107c2ba25c7c52741b34463e081f3b222839f2a79338bda8bbcbac75044843"
+        },
+        "output.txt": {
+          "bytes": 602,
+          "sha256": "4902380bd18019baf198afcbb769a8de082a670c957b06f3e477f9881158b323"
+        },
+        "result.json": {
+          "bytes": 1834,
+          "sha256": "1b3b300e046e4a63a94e28a45bbf7117f6090b8117c086d3d75393f4fda4ea96"
+        },
+        "standalone.json": {
+          "bytes": 237,
+          "sha256": "7d22b5363be915c8fadeaf2d25c6b06a2a508076bbf970275780274cac034023"
+        }
+      }
+    },
     "layout-inferred-tmatrue-a-v2": {
       "label": "layout-inferred-tmatrue-a-v2",
       "started_utc": "2026-11-04T01:38:51.918084+00:00",
@@ -6520,6 +7414,113 @@
         "result.json": {
           "bytes": 1809,
           "sha256": "6671d8cd506d04a72e0e9dab1f4dae0dd07f7ad32ee63d6c5aa860cffd81620e"
+        },
+        "standalone.json": {
+          "bytes": 238,
+          "sha256": "f3419dcf0c82f54f54961422c7e3e091031bbe580a7d0cd9de98bf29103e7029"
+        }
+      }
+    },
+    "layout-inferred-tmatrue-b-v2": {
+      "label": "layout-inferred-tmatrue-b-v2",
+      "started_utc": "2026-11-04T02:00:39.083400+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-layout-inferred-tmatrue-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/layout-inferred-tmatrue-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/layout-inferred-tmatrue-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred"
+      ],
+      "before_memory_bytes": 122940043264,
+      "start_hottest_c": 48.6,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:44.090776+00:00",
+      "memory_aborted": false,
+      "output_sha256": "69c129467abf207ccac8f5de20c5ecc021a35b38389f4063ac6a560fed59185d",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "inferred-tma-disabled-False",
+          "status": "passed",
+          "details": {
+            "wrong_elements": [
+              0,
+              0,
+              0
+            ],
+            "inputs": "small exact integers, seed 29",
+            "issue": 3571
+          }
+        }
+      ],
+      "min_host_available_bytes": 121895727104,
+      "max_hottest_c": 53.5,
+      "files": {
+        "command.json": {
+          "bytes": 1626,
+          "sha256": "6d2cdfc64c7f840f12505ba9704d10ae1c9cafe5c2d62ed318b616ffdd2789ea"
+        },
+        "layout-inferred-False.cu": {
+          "bytes": 5181,
+          "sha256": "414eae8344c169dd36f3238633ab1dae3866d7e5f747f03bd6c45ba56abbe84b"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "606568af691ee1f730307743de40f99ce2c53f1fedb4a9ca3e47a1d42c2f8187"
+        },
+        "output.txt": {
+          "bytes": 603,
+          "sha256": "69c129467abf207ccac8f5de20c5ecc021a35b38389f4063ac6a560fed59185d"
+        },
+        "result.json": {
+          "bytes": 1809,
+          "sha256": "7be35f65a38ea7941069f2f79b27875b2e037ec01bfae322ee76de4f38d7874a"
         },
         "standalone.json": {
           "bytes": 238,
@@ -6635,6 +7636,114 @@
         }
       }
     },
+    "layout-linear-tmafalse-b-v2": {
+      "label": "layout-linear-tmafalse-b-v2",
+      "started_utc": "2026-11-04T02:01:04.126831+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-layout-linear-tmafalse-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/layout-linear-tmafalse-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/layout-linear-tmafalse-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear",
+        "--disable-tma"
+      ],
+      "before_memory_bytes": 123532726272,
+      "start_hottest_c": 48.8,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:01:09.134371+00:00",
+      "memory_aborted": false,
+      "output_sha256": "b804c5c3e7bff1cd12fea10cf5f6d9a2084a9fb4413e637288908b6d20d5d449",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "linear-tma-disabled-True",
+          "status": "passed",
+          "details": {
+            "wrong_elements": [
+              0,
+              0,
+              0
+            ],
+            "inputs": "small exact integers, seed 29",
+            "issue": 3571
+          }
+        }
+      ],
+      "min_host_available_bytes": 122372657152,
+      "max_hottest_c": 53.8,
+      "files": {
+        "command.json": {
+          "bytes": 1641,
+          "sha256": "be388070e81e2b611136db0075870e881f1938a9ff32f9f46e30623ae155f0bc"
+        },
+        "layout-linear-True.cu": {
+          "bytes": 8274,
+          "sha256": "b6b66ad6d6409d0533c2e86695ef73aeb45a3cbfbb345f9b5b8b2fdebb571b0c"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "700f3bec9330a417639889f0fca51b897bfbc17df66829eb516e6732f174ee0e"
+        },
+        "output.txt": {
+          "bytes": 600,
+          "sha256": "b804c5c3e7bff1cd12fea10cf5f6d9a2084a9fb4413e637288908b6d20d5d449"
+        },
+        "result.json": {
+          "bytes": 1824,
+          "sha256": "ea3d05a1d5c0861e0a044073a4380e923515f41a24317e738576d6e93bd7b9ab"
+        },
+        "standalone.json": {
+          "bytes": 235,
+          "sha256": "4c59b1e9f60268387cb24baf675b2ed5c69a2d85006338f4f87fb6049164c463"
+        }
+      }
+    },
     "layout-linear-tmatrue-a-v2": {
       "label": "layout-linear-tmatrue-a-v2",
       "started_utc": "2026-11-04T01:39:11.953660+00:00",
@@ -6731,6 +7840,105 @@
         "standalone.json": {
           "bytes": 880,
           "sha256": "317ba3ff4be375f19d860a2bd2f897b9934d37a4568c45eabfd2fbdd117d46d9"
+        }
+      }
+    },
+    "layout-linear-tmatrue-b-v2": {
+      "label": "layout-linear-tmatrue-b-v2",
+      "started_utc": "2026-11-04T02:00:59.118283+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-layout-linear-tmatrue-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/layout-linear-tmatrue-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/layout-linear-tmatrue-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear"
+      ],
+      "before_memory_bytes": 123556548608,
+      "start_hottest_c": 49.5,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 1,
+      "ended_utc": "2026-11-04T02:01:04.125470+00:00",
+      "memory_aborted": false,
+      "output_sha256": "96ac1311cf17221832358b7dbbd7683421049a2f6bce4f7a9696744e3b2b2202",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "linear-tma-disabled-False",
+          "status": "failed",
+          "error": "Traceback (most recent call last):\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 23, in check\n    details = function()\n              ^^^^^^^^^^\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 330, in <lambda>\n    check(f\"{name}-tma-disabled-{disabled}\", lambda name=name, disabled=disabled: layout(name, disabled))\n                                                                                  ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 229, in layout\n    assert not any(wrong), f\"wrong element counts: {wrong}\"\n           ^^^^^^^^^^^^^^\nAssertionError: wrong element counts: [2978, 0, 26883]\n"
+        }
+      ],
+      "min_host_available_bytes": 122438696960,
+      "max_hottest_c": 53.4,
+      "files": {
+        "command.json": {
+          "bytes": 1616,
+          "sha256": "c5656154bfdfefb4dd3fc191218a5c24256a3ed1834b6ab472df2c4073521b30"
+        },
+        "layout-linear-False.cu": {
+          "bytes": 4834,
+          "sha256": "79de86ea74a213ffec28b96f535f8f887796ffa78a0d1ba39de20dd8762ecda6"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "5d57465692a53641b3268723ede473913cd3d85e87109dd786668e35f41ac3ce"
+        },
+        "output.txt": {
+          "bytes": 1299,
+          "sha256": "96ac1311cf17221832358b7dbbd7683421049a2f6bce4f7a9696744e3b2b2202"
+        },
+        "result.json": {
+          "bytes": 1799,
+          "sha256": "e26891af637e0743d4cb3031790d2e023d951982ebc692784313916805b7748d"
+        },
+        "standalone.json": {
+          "bytes": 878,
+          "sha256": "94dff200ee4a9333dece566e98bdca386927e2a654b5cceadd6086b0f2199661"
         }
       }
     },
@@ -6842,6 +8050,114 @@
         }
       }
     },
+    "layout-swizzled-tmafalse-b-v2": {
+      "label": "layout-swizzled-tmafalse-b-v2",
+      "started_utc": "2026-11-04T02:00:54.110936+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-layout-swizzled-tmafalse-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/layout-swizzled-tmafalse-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/layout-swizzled-tmafalse-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled",
+        "--disable-tma"
+      ],
+      "before_memory_bytes": 123383152640,
+      "start_hottest_c": 48.8,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:59.117097+00:00",
+      "memory_aborted": false,
+      "output_sha256": "5139d70ade4ba971f99f29859817a3f475860ab7cacb581acbb825ad10299994",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "swizzled-tma-disabled-True",
+          "status": "passed",
+          "details": {
+            "wrong_elements": [
+              0,
+              0,
+              0
+            ],
+            "inputs": "small exact integers, seed 29",
+            "issue": 3571
+          }
+        }
+      ],
+      "min_host_available_bytes": 122324099072,
+      "max_hottest_c": 56.6,
+      "files": {
+        "command.json": {
+          "bytes": 1651,
+          "sha256": "786ce9b3fe1289005615be9bf719be1c99696fcdca3e7e83167d28b8b32d89ff"
+        },
+        "layout-swizzled-True.cu": {
+          "bytes": 10376,
+          "sha256": "8828c7596d7e760ba77c5d2d251b6e79ea98a559d942b1ea9eab9f2d4963bf87"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "dc2fadc5cbc2f5bc7d0763770e1ca3d904f1ab8f21ebd1a4e0fd903f0b0e9a16"
+        },
+        "output.txt": {
+          "bytes": 602,
+          "sha256": "5139d70ade4ba971f99f29859817a3f475860ab7cacb581acbb825ad10299994"
+        },
+        "result.json": {
+          "bytes": 1834,
+          "sha256": "3ce2de80312defdd5b9742c01f172904cfff3e783383af8787762be8f4947225"
+        },
+        "standalone.json": {
+          "bytes": 237,
+          "sha256": "354b44e6c945cc508aa101e96a359c1e33ba0b498de43e71511841cb5112eec5"
+        }
+      }
+    },
     "layout-swizzled-tmatrue-a-v2": {
       "label": "layout-swizzled-tmatrue-a-v2",
       "started_utc": "2026-11-04T01:39:01.934514+00:00",
@@ -6942,6 +8258,113 @@
         "result.json": {
           "bytes": 1809,
           "sha256": "068bf9afd18f8a1ed1363b5b9154eb4365188d7a8e51c4620bfacf22fdba3f2c"
+        },
+        "standalone.json": {
+          "bytes": 238,
+          "sha256": "6c4275b78d125a56d908f668b5cae9cfaf66655eaf730836dae26dd0759fbc4e"
+        }
+      }
+    },
+    "layout-swizzled-tmatrue-b-v2": {
+      "label": "layout-swizzled-tmatrue-b-v2",
+      "started_utc": "2026-11-04T02:00:49.101980+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-layout-swizzled-tmatrue-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/layout-swizzled-tmatrue-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/layout-swizzled-tmatrue-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled"
+      ],
+      "before_memory_bytes": 123306299392,
+      "start_hottest_c": 49.4,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:54.109702+00:00",
+      "memory_aborted": false,
+      "output_sha256": "a32e342fe57a834719d9d636e9860e9c65524745e5b2017a12dc58cc5653eb64",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "swizzled-tma-disabled-False",
+          "status": "passed",
+          "details": {
+            "wrong_elements": [
+              0,
+              0,
+              0
+            ],
+            "inputs": "small exact integers, seed 29",
+            "issue": 3571
+          }
+        }
+      ],
+      "min_host_available_bytes": 122383503360,
+      "max_hottest_c": 52.4,
+      "files": {
+        "command.json": {
+          "bytes": 1626,
+          "sha256": "3c4c1446dcaf4283124a1d7c107e6d333bf0ee3db01fa8f23038d4da83d0aec9"
+        },
+        "layout-swizzled-False.cu": {
+          "bytes": 5181,
+          "sha256": "414eae8344c169dd36f3238633ab1dae3866d7e5f747f03bd6c45ba56abbe84b"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "e866b22c0345918cc0855a7bbe2729654516cb4c4acc8c49333b6868fd77afe1"
+        },
+        "output.txt": {
+          "bytes": 603,
+          "sha256": "a32e342fe57a834719d9d636e9860e9c65524745e5b2017a12dc58cc5653eb64"
+        },
+        "result.json": {
+          "bytes": 1809,
+          "sha256": "a27911d0503088b307909a4e7f5583d695e3a2b9e76b3e43a235cbdc762c004c"
         },
         "standalone.json": {
           "bytes": 238,
@@ -7069,6 +8492,133 @@
         "result.json": {
           "bytes": 1751,
           "sha256": "2b24c88f9a6f0f52c123d7bf08fbb5a1cc839dd58f2db5c56441ef458159f58c"
+        },
+        "standalone.json": {
+          "bytes": 503,
+          "sha256": "b03e80164d977e4fa1a28d475448994c0e259f5a02d91a818e27f74cbfaddf92"
+        }
+      }
+    },
+    "prefetch-pr3490-b-v2": {
+      "label": "prefetch-pr3490-b-v2",
+      "started_utc": "2026-11-04T02:00:26.062097+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/pr3490",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-prefetch-pr3490-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/prefetch-pr3490-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/prefetch-pr3490-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/pr3490",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prefetch"
+      ],
+      "before_memory_bytes": 123238543360,
+      "start_hottest_c": 49.6,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:34.072677+00:00",
+      "memory_aborted": false,
+      "output_sha256": "a53f02ab41961028169d5a881472b2def7be39fa4e9c89c67fd51eb096cf9854",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "None",
+          "status": "passed",
+          "details": {
+            "input_unchanged": true,
+            "output_equal": true,
+            "policy": null
+          }
+        },
+        {
+          "name": "evict_normal",
+          "status": "passed",
+          "details": {
+            "input_unchanged": true,
+            "output_equal": true,
+            "policy": "evict_normal"
+          }
+        },
+        {
+          "name": "evict_last",
+          "status": "passed",
+          "details": {
+            "input_unchanged": true,
+            "output_equal": true,
+            "policy": "evict_last"
+          }
+        }
+      ],
+      "min_host_available_bytes": 122420858880,
+      "max_hottest_c": 51.9,
+      "files": {
+        "command.json": {
+          "bytes": 1568,
+          "sha256": "5399f1a061448543a940a9c86456b282a522f8eff46fb4b1bce86a6f0435db81"
+        },
+        "memory.jsonl": {
+          "bytes": 768,
+          "sha256": "1c654e1ff44b792d434bd848f657ee391415b0e18d07baa4aa949ee7436a335d"
+        },
+        "output.txt": {
+          "bytes": 1668,
+          "sha256": "a53f02ab41961028169d5a881472b2def7be39fa4e9c89c67fd51eb096cf9854"
+        },
+        "prefetch-None.ptx": {
+          "bytes": 2562,
+          "sha256": "4dd75d4121d97773527d5433b06da7e97f6bf0114e36201f05a225672dd33d8a"
+        },
+        "prefetch-evict_last.ptx": {
+          "bytes": 2569,
+          "sha256": "a8b999e1b4ae2577d4f4e180a9d71246c6e5424bd2e73d20686247f3e390e5a3"
+        },
+        "prefetch-evict_normal.ptx": {
+          "bytes": 2567,
+          "sha256": "c03d338fc7299681fb87debe4905bc7a82948143dae19f1cb70b13ab8738a08e"
+        },
+        "result.json": {
+          "bytes": 1751,
+          "sha256": "1c6ad1926e953a8e5110e88b991d080be8417454f745a28e8b06361f7d12bff4"
         },
         "standalone.json": {
           "bytes": 503,
@@ -8372,6 +9922,466 @@
         }
       }
     },
+    "reductions-base-b-v2": {
+      "label": "reductions-base-b-v2",
+      "started_utc": "2026-11-04T02:00:10.037139+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-reductions-base-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/reductions-base-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/reductions-base-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "before_memory_bytes": 123310940160,
+      "start_hottest_c": 49.6,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:17.046029+00:00",
+      "memory_aborted": false,
+      "output_sha256": "cfe007a087b65ff730305c3bc151486b2851d04a5d96c8f769808e5b6b448af3",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "256-128-sum",
+          "status": "passed",
+          "details": {
+            "values": [
+              4.58811616897583,
+              14.175169944763184,
+              -9.517807006835938,
+              10.782572746276855,
+              15.538665771484375,
+              7.5037336349487305,
+              -4.960536956787109,
+              -12.987915992736816,
+              17.565690994262695,
+              -18.915393829345703,
+              21.514400482177734,
+              21.14141845703125,
+              -21.74091339111328,
+              -35.250606536865234,
+              5.538739204406738,
+              -2.804438591003418,
+              -3.680418014526367,
+              -25.69019317626953,
+              0.12778210639953613,
+              13.941184997558594,
+              -10.196918487548828,
+              -15.657036781311035,
+              6.109145164489746,
+              -0.8931055068969727,
+              32.21269226074219,
+              -6.673527717590332,
+              2.1495437622070312,
+              -3.1837825775146484,
+              -6.102344512939453,
+              -10.65505599975586,
+              21.003379821777344,
+              30.602863311767578,
+              19.774085998535156,
+              -4.66671085357666,
+              -25.493900299072266,
+              -20.834671020507812,
+              -30.18292999267578,
+              6.702789306640625,
+              2.8125133514404297,
+              7.209848403930664,
+              14.456122398376465,
+              17.82308006286621,
+              43.56470489501953,
+              -14.439372062683105,
+              -16.19681167602539,
+              -28.06189727783203,
+              13.9900541305542,
+              3.4403762817382812,
+              3.0489437580108643,
+              13.056344032287598,
+              -29.05386734008789,
+              -1.6158123016357422,
+              -7.661301136016846,
+              -7.160119533538818,
+              14.29361343383789,
+              -1.0465617179870605,
+              -5.273645877838135,
+              -3.5424814224243164,
+              23.29638671875,
+              -7.996789932250977,
+              4.983668804168701,
+              9.15557861328125,
+              23.723636627197266,
+              -3.859726905822754
+            ],
+            "output_sha256": "15ed41f3dac40c8343a71dc9aec5bfc6e8c2a94ff94b4fcef62d10f2d13ebe18",
+            "max_abs_error_from_fp64": 3.924360498785973e-06,
+            "timing": {
+              "mean_us": 0.8315377765231662,
+              "ci95_us": 0.007555270061585539,
+              "samples_us": [
+                0.8575040102005005,
+                0.8313599824905396,
+                0.8266879916191101,
+                0.8273280262947083,
+                0.8271679878234863,
+                0.8285120129585266,
+                0.8282560110092163,
+                0.8286399841308594,
+                0.8283839821815491
+              ]
+            }
+          }
+        },
+        {
+          "name": "256-128-max",
+          "status": "passed",
+          "details": {
+            "values": [
+              2.2307941913604736,
+              2.992506265640259,
+              2.3673648834228516,
+              2.487748384475708,
+              2.5883872509002686,
+              2.3016629219055176,
+              3.065178632736206,
+              3.8359267711639404,
+              2.893141031265259,
+              2.609893560409546,
+              3.5077104568481445,
+              2.415666341781616,
+              2.472397565841675,
+              2.2934694290161133,
+              2.8387668132781982,
+              2.6766514778137207,
+              3.0921714305877686,
+              2.791705846786499,
+              2.749279737472534,
+              2.884958028793335,
+              2.5892090797424316,
+              2.63960599899292,
+              2.6733360290527344,
+              2.5436177253723145,
+              2.6952033042907715,
+              2.7966182231903076,
+              3.315114974975586,
+              3.640080213546753,
+              2.4815986156463623,
+              2.7910661697387695,
+              2.1575560569763184,
+              3.16394305229187,
+              3.2751834392547607,
+              3.803159475326538,
+              2.5537102222442627,
+              2.2380337715148926,
+              2.7059967517852783,
+              2.3092877864837646,
+              3.182171583175659,
+              3.4716949462890625,
+              2.3839316368103027,
+              2.914231538772583,
+              4.2476654052734375,
+              2.923635959625244,
+              2.55560302734375,
+              2.8233039379119873,
+              2.9998679161071777,
+              2.8103413581848145,
+              2.545010566711426,
+              2.349903106689453,
+              2.5122287273406982,
+              2.100245714187622,
+              3.791971445083618,
+              3.0648584365844727,
+              3.2212281227111816,
+              3.12119460105896,
+              3.3908112049102783,
+              3.302100658416748,
+              3.206592559814453,
+              2.707130193710327,
+              2.451598644256592,
+              2.982470750808716,
+              3.2790699005126953,
+              2.8881735801696777
+            ],
+            "output_sha256": "f81c74e5846cd0bcf1908b8f97ce06e8d64d85c155725fcffbcc4669c55a50d8",
+            "max_abs_error_from_fp64": 0.0,
+            "timing": {
+              "mean_us": 0.8703573213683234,
+              "ci95_us": 0.007153901414065759,
+              "samples_us": [
+                0.8950719833374023,
+                0.8657919764518738,
+                0.86735999584198,
+                0.868511974811554,
+                0.8680639863014221,
+                0.8672000169754028,
+                0.8666239976882935,
+                0.8679999709129333,
+                0.8665919899940491
+              ]
+            }
+          }
+        },
+        {
+          "name": "1024-256-sum",
+          "status": "passed",
+          "details": {
+            "values": [
+              20.028045654296875,
+              5.09394645690918,
+              41.306121826171875,
+              -54.257225036621094,
+              -15.30164623260498,
+              -20.63791847229004,
+              24.504924774169922,
+              34.848854064941406,
+              -31.22119903564453,
+              -13.457782745361328,
+              61.40453338623047,
+              -26.828275680541992,
+              -14.564391136169434,
+              -1.574369192123413,
+              6.483470916748047,
+              34.0031623840332,
+              -25.66008758544922,
+              -38.668373107910156,
+              2.3552284240722656,
+              -7.395766258239746,
+              -18.574993133544922,
+              42.976287841796875,
+              -6.141359329223633,
+              21.176219940185547,
+              3.4415225982666016,
+              26.11515998840332,
+              26.267026901245117,
+              11.985812187194824,
+              6.593878746032715,
+              34.939117431640625,
+              -35.71200180053711,
+              -26.520267486572266,
+              34.85955047607422,
+              6.953286170959473,
+              53.25387954711914,
+              37.44419860839844,
+              -5.56602668762207,
+              50.47882843017578,
+              -18.067556381225586,
+              -33.20443344116211,
+              39.186676025390625,
+              16.660022735595703,
+              13.230777740478516,
+              -47.808753967285156,
+              15.2809419631958,
+              -35.893672943115234,
+              -28.335872650146484,
+              51.7208366394043,
+              45.51123809814453,
+              3.8022308349609375,
+              -6.575429916381836,
+              -12.738429069519043,
+              9.292486190795898,
+              -21.670137405395508,
+              -2.6592891216278076,
+              -26.536842346191406,
+              20.454883575439453,
+              -25.652191162109375,
+              81.21098327636719,
+              -30.28797721862793,
+              -40.96990203857422,
+              3.603971481323242,
+              -4.669118881225586,
+              29.522785186767578
+            ],
+            "output_sha256": "82a8ef969b5e46e4ad5b8aaa706da07b06bf974798cb2282ade68e134dc942a7",
+            "max_abs_error_from_fp64": 6.621805368922651e-06,
+            "timing": {
+              "mean_us": 0.9658346639739143,
+              "ci95_us": 0.005660514790621674,
+              "samples_us": [
+                0.9848639965057373,
+                0.9592639803886414,
+                0.9633280038833618,
+                0.965503990650177,
+                0.9647359848022461,
+                0.9641280174255371,
+                0.9648640155792236,
+                0.9629759788513184,
+                0.9628480076789856
+              ]
+            }
+          }
+        },
+        {
+          "name": "1024-256-max",
+          "status": "passed",
+          "details": {
+            "values": [
+              2.992506265640259,
+              3.8359267711639404,
+              3.5077104568481445,
+              2.8387668132781982,
+              3.0921714305877686,
+              2.6733360290527344,
+              3.640080213546753,
+              3.16394305229187,
+              3.803159475326538,
+              3.4716949462890625,
+              4.2476654052734375,
+              2.9998679161071777,
+              2.545010566711426,
+              3.791971445083618,
+              3.3908112049102783,
+              3.2790699005126953,
+              3.0012290477752686,
+              3.00473690032959,
+              3.188419818878174,
+              3.0557329654693604,
+              3.4261116981506348,
+              3.151386022567749,
+              3.5007143020629883,
+              3.03922963142395,
+              3.807925224304199,
+              2.8706400394439697,
+              2.945798397064209,
+              3.0231809616088867,
+              3.40144681930542,
+              3.4419026374816895,
+              3.390266180038452,
+              4.270053386688232,
+              3.645970344543457,
+              3.2058751583099365,
+              3.452303886413574,
+              3.141556739807129,
+              4.12647819519043,
+              3.041374683380127,
+              3.50386381149292,
+              2.925973653793335,
+              3.121269702911377,
+              2.9711999893188477,
+              3.437878131866455,
+              2.595033645629883,
+              3.177459478378296,
+              2.991647720336914,
+              3.618048667907715,
+              3.6190919876098633,
+              3.461090564727783,
+              4.111873626708984,
+              2.9322123527526855,
+              2.802973985671997,
+              3.2431106567382812,
+              3.059272527694702,
+              3.5020065307617188,
+              3.8487603664398193,
+              3.795708656311035,
+              3.6822197437286377,
+              4.001986026763916,
+              2.7133800983428955,
+              2.9487552642822266,
+              3.073268175125122,
+              2.857534885406494,
+              3.612482786178589
+            ],
+            "output_sha256": "b86a5bbe27e615026ee64bff778bc241e9d21532d7e7e656ffb63abb80870b84",
+            "max_abs_error_from_fp64": 0.0,
+            "timing": {
+              "mean_us": 0.9925795528623793,
+              "ci95_us": 0.007617686023596133,
+              "samples_us": [
+                1.0177600383758545,
+                0.9884799718856812,
+                0.9907519817352295,
+                0.9822080135345459,
+                0.9932799935340881,
+                0.9899839758872986,
+                0.9903039932250977,
+                0.9897599816322327,
+                0.9906880259513855
+              ]
+            }
+          }
+        }
+      ],
+      "min_host_available_bytes": 121931714560,
+      "max_hottest_c": 55.6,
+      "files": {
+        "command.json": {
+          "bytes": 1566,
+          "sha256": "90135465dbe34e484d4d7c0a67b2871c935398e54b0cdab09615ed9ba40e5cfe"
+        },
+        "memory.jsonl": {
+          "bytes": 672,
+          "sha256": "6bf8af8e6ad2adad8b0d75c8712bcce1fda7254714672d693d17e6dc5f8d1c44"
+        },
+        "output.txt": {
+          "bytes": 8099,
+          "sha256": "cfe007a087b65ff730305c3bc151486b2851d04a5d96c8f769808e5b6b448af3"
+        },
+        "reduce-1024-256-max.cu": {
+          "bytes": 1405,
+          "sha256": "e5f2168a7dba833a7154069f55b1137ceb678b3036831b91d98d524a6792085f"
+        },
+        "reduce-1024-256-sum.cu": {
+          "bytes": 1385,
+          "sha256": "a74a1b14e4b8269372a0f69664d6c89a8cbf94dfa5e902fa6286665650bd5855"
+        },
+        "reduce-256-128-max.cu": {
+          "bytes": 1339,
+          "sha256": "71db7faf26a2c5d02126d348bb974f44e88a602a6197a1db0ed2484d0752c8c3"
+        },
+        "reduce-256-128-sum.cu": {
+          "bytes": 1319,
+          "sha256": "845cd5f0b573e9d3981235944e06e1ee77313870d10dc5807da76efbf26f86fe"
+        },
+        "result.json": {
+          "bytes": 1749,
+          "sha256": "8fff198425288c8eaea987a6f21d9737e75ac3af5df9f728caeffc07bbbc7dd1"
+        },
+        "standalone.json": {
+          "bytes": 9704,
+          "sha256": "f8926facb5138bb5c9f198aa12c1b28a2c9a26d861b1ed8caffbddbdd2b81d7e"
+        }
+      }
+    },
     "reductions-without-3715-a-v2": {
       "label": "reductions-without-3715-a-v2",
       "started_utc": "2026-11-04T01:38:15.865676+00:00",
@@ -8832,6 +10842,466 @@
         }
       }
     },
+    "reductions-without-3715-b-v2": {
+      "label": "reductions-without-3715-b-v2",
+      "started_utc": "2026-11-04T02:00:03.023906+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/without-3715",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-reductions-without-3715-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/reductions-without-3715-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/reductions-without-3715-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/without-3715",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "before_memory_bytes": 123557380096,
+      "start_hottest_c": 49.6,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:10.035871+00:00",
+      "memory_aborted": false,
+      "output_sha256": "ac512ccdfc8518af29860858cce083aef5b4a3e7b6e939c4d4b5a9da35328531",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "256-128-sum",
+          "status": "passed",
+          "details": {
+            "values": [
+              4.588115692138672,
+              14.175167083740234,
+              -9.517807006835938,
+              10.782570838928223,
+              15.538667678833008,
+              7.503733158111572,
+              -4.960538864135742,
+              -12.987915992736816,
+              17.565692901611328,
+              -18.915393829345703,
+              21.514400482177734,
+              21.14141845703125,
+              -21.74091339111328,
+              -35.250606536865234,
+              5.53873872756958,
+              -2.804436683654785,
+              -3.6804184913635254,
+              -25.69019317626953,
+              0.12778162956237793,
+              13.941184043884277,
+              -10.196922302246094,
+              -15.657037734985352,
+              6.1091461181640625,
+              -0.8931055068969727,
+              32.21269226074219,
+              -6.673530578613281,
+              2.149547576904297,
+              -3.1837823390960693,
+              -6.1023454666137695,
+              -10.655055046081543,
+              21.00338363647461,
+              30.60286521911621,
+              19.77408790588379,
+              -4.666712284088135,
+              -25.493900299072266,
+              -20.834671020507812,
+              -30.18292999267578,
+              6.70278787612915,
+              2.812514305114746,
+              7.209848403930664,
+              14.456122398376465,
+              17.823081970214844,
+              43.56470489501953,
+              -14.439371109008789,
+              -16.19681167602539,
+              -28.061893463134766,
+              13.990055084228516,
+              3.440375328063965,
+              3.048943519592285,
+              13.056343078613281,
+              -29.05386734008789,
+              -1.615811824798584,
+              -7.66130256652832,
+              -7.160118103027344,
+              14.29361343383789,
+              -1.0465641021728516,
+              -5.273645401000977,
+              -3.542480945587158,
+              23.29638671875,
+              -7.996789932250977,
+              4.983671188354492,
+              9.155580520629883,
+              23.72364044189453,
+              -3.8597261905670166
+            ],
+            "output_sha256": "ea5a6e7f30b6aa95283816f8e34ca9d9de93d219ba1c926c8627c85d7de49111",
+            "max_abs_error_from_fp64": 3.252178430557251e-06,
+            "timing": {
+              "mean_us": 0.8678044411871169,
+              "ci95_us": 0.0648417411791944,
+              "samples_us": [
+                0.8598080277442932,
+                0.8243200182914734,
+                1.045375943183899,
+                0.9783999919891357,
+                0.8223040103912354,
+                0.8192960023880005,
+                0.8200640082359314,
+                0.8209599852561951,
+                0.8197119832038879
+              ]
+            }
+          }
+        },
+        {
+          "name": "256-128-max",
+          "status": "passed",
+          "details": {
+            "values": [
+              2.2307941913604736,
+              2.992506265640259,
+              2.3673648834228516,
+              2.487748384475708,
+              2.5883872509002686,
+              2.3016629219055176,
+              3.065178632736206,
+              3.8359267711639404,
+              2.893141031265259,
+              2.609893560409546,
+              3.5077104568481445,
+              2.415666341781616,
+              2.472397565841675,
+              2.2934694290161133,
+              2.8387668132781982,
+              2.6766514778137207,
+              3.0921714305877686,
+              2.791705846786499,
+              2.749279737472534,
+              2.884958028793335,
+              2.5892090797424316,
+              2.63960599899292,
+              2.6733360290527344,
+              2.5436177253723145,
+              2.6952033042907715,
+              2.7966182231903076,
+              3.315114974975586,
+              3.640080213546753,
+              2.4815986156463623,
+              2.7910661697387695,
+              2.1575560569763184,
+              3.16394305229187,
+              3.2751834392547607,
+              3.803159475326538,
+              2.5537102222442627,
+              2.2380337715148926,
+              2.7059967517852783,
+              2.3092877864837646,
+              3.182171583175659,
+              3.4716949462890625,
+              2.3839316368103027,
+              2.914231538772583,
+              4.2476654052734375,
+              2.923635959625244,
+              2.55560302734375,
+              2.8233039379119873,
+              2.9998679161071777,
+              2.8103413581848145,
+              2.545010566711426,
+              2.349903106689453,
+              2.5122287273406982,
+              2.100245714187622,
+              3.791971445083618,
+              3.0648584365844727,
+              3.2212281227111816,
+              3.12119460105896,
+              3.3908112049102783,
+              3.302100658416748,
+              3.206592559814453,
+              2.707130193710327,
+              2.451598644256592,
+              2.982470750808716,
+              3.2790699005126953,
+              2.8881735801696777
+            ],
+            "output_sha256": "f81c74e5846cd0bcf1908b8f97ce06e8d64d85c155725fcffbcc4669c55a50d8",
+            "max_abs_error_from_fp64": 0.0,
+            "timing": {
+              "mean_us": 0.8552284505632188,
+              "ci95_us": 0.047704483724563214,
+              "samples_us": [
+                0.8540160059928894,
+                0.8207679986953735,
+                1.0188159942626953,
+                0.8443840146064758,
+                0.8301759958267212,
+                0.8314560055732727,
+                0.8321599960327148,
+                0.8325440287590027,
+                0.8327360153198242
+              ]
+            }
+          }
+        },
+        {
+          "name": "1024-256-sum",
+          "status": "passed",
+          "details": {
+            "values": [
+              20.028053283691406,
+              5.0939483642578125,
+              41.306114196777344,
+              -54.25722122192383,
+              -15.30164623260498,
+              -20.637920379638672,
+              24.504926681518555,
+              34.848846435546875,
+              -31.221202850341797,
+              -13.457783699035645,
+              61.40452575683594,
+              -26.82827377319336,
+              -14.5643892288208,
+              -1.5743694305419922,
+              6.4834699630737305,
+              34.00316619873047,
+              -25.66008758544922,
+              -38.66838073730469,
+              2.355226516723633,
+              -7.395772933959961,
+              -18.574993133544922,
+              42.976287841796875,
+              -6.141359329223633,
+              21.176219940185547,
+              3.4415206909179688,
+              26.115163803100586,
+              26.26702880859375,
+              11.98581314086914,
+              6.593875408172607,
+              34.93911361694336,
+              -35.712005615234375,
+              -26.520265579223633,
+              34.85954666137695,
+              6.953285217285156,
+              53.253883361816406,
+              37.44419860839844,
+              -5.5660247802734375,
+              50.47883224487305,
+              -18.06755828857422,
+              -33.20443344116211,
+              39.18667984008789,
+              16.660024642944336,
+              13.23077392578125,
+              -47.808753967285156,
+              15.2809419631958,
+              -35.8936767578125,
+              -28.33587646484375,
+              51.7208366394043,
+              45.51123809814453,
+              3.8022308349609375,
+              -6.575428009033203,
+              -12.73842716217041,
+              9.292487144470215,
+              -21.670135498046875,
+              -2.659292221069336,
+              -26.53684425354004,
+              20.454883575439453,
+              -25.652191162109375,
+              81.21098327636719,
+              -30.287979125976562,
+              -40.96990203857422,
+              3.603973865509033,
+              -4.669123649597168,
+              29.522789001464844
+            ],
+            "output_sha256": "28c5f1cfed6cf725af6a780b0c5f73cc0402bd05c576f901a1dca0d50206b494",
+            "max_abs_error_from_fp64": 7.890643246355467e-06,
+            "timing": {
+              "mean_us": 1.0031644503275554,
+              "ci95_us": 0.004144196444498412,
+              "samples_us": [
+                1.016319990158081,
+                0.9985920190811157,
+                1.000704050064087,
+                1.0005760192871094,
+                1.005952000617981,
+                1.0016000270843506,
+                1.0019199848175049,
+                1.003391981124878,
+                0.9994239807128906
+              ]
+            }
+          }
+        },
+        {
+          "name": "1024-256-max",
+          "status": "passed",
+          "details": {
+            "values": [
+              2.992506265640259,
+              3.8359267711639404,
+              3.5077104568481445,
+              2.8387668132781982,
+              3.0921714305877686,
+              2.6733360290527344,
+              3.640080213546753,
+              3.16394305229187,
+              3.803159475326538,
+              3.4716949462890625,
+              4.2476654052734375,
+              2.9998679161071777,
+              2.545010566711426,
+              3.791971445083618,
+              3.3908112049102783,
+              3.2790699005126953,
+              3.0012290477752686,
+              3.00473690032959,
+              3.188419818878174,
+              3.0557329654693604,
+              3.4261116981506348,
+              3.151386022567749,
+              3.5007143020629883,
+              3.03922963142395,
+              3.807925224304199,
+              2.8706400394439697,
+              2.945798397064209,
+              3.0231809616088867,
+              3.40144681930542,
+              3.4419026374816895,
+              3.390266180038452,
+              4.270053386688232,
+              3.645970344543457,
+              3.2058751583099365,
+              3.452303886413574,
+              3.141556739807129,
+              4.12647819519043,
+              3.041374683380127,
+              3.50386381149292,
+              2.925973653793335,
+              3.121269702911377,
+              2.9711999893188477,
+              3.437878131866455,
+              2.595033645629883,
+              3.177459478378296,
+              2.991647720336914,
+              3.618048667907715,
+              3.6190919876098633,
+              3.461090564727783,
+              4.111873626708984,
+              2.9322123527526855,
+              2.802973985671997,
+              3.2431106567382812,
+              3.059272527694702,
+              3.5020065307617188,
+              3.8487603664398193,
+              3.795708656311035,
+              3.6822197437286377,
+              4.001986026763916,
+              2.7133800983428955,
+              2.9487552642822266,
+              3.073268175125122,
+              2.857534885406494,
+              3.612482786178589
+            ],
+            "output_sha256": "b86a5bbe27e615026ee64bff778bc241e9d21532d7e7e656ffb63abb80870b84",
+            "max_abs_error_from_fp64": 0.0,
+            "timing": {
+              "mean_us": 1.0023715562290616,
+              "ci95_us": 0.005245556926741478,
+              "samples_us": [
+                1.0168639421463013,
+                0.9987199902534485,
+                1.0005120038986206,
+                0.9904320240020752,
+                1.0022720098495483,
+                1.0025279521942139,
+                1.0033600330352783,
+                1.0037440061569214,
+                1.0029120445251465
+              ]
+            }
+          }
+        }
+      ],
+      "min_host_available_bytes": 122042912768,
+      "max_hottest_c": 52.9,
+      "files": {
+        "command.json": {
+          "bytes": 1614,
+          "sha256": "6cd913cc506353f5b4d0165c2ce6fcb54a9b4700fd73a93865564c37aa5a6cc5"
+        },
+        "memory.jsonl": {
+          "bytes": 672,
+          "sha256": "a014e3a10d40597e46e580b744b57de10ddffd4f45b0830078eb881471f0b6c4"
+        },
+        "output.txt": {
+          "bytes": 8105,
+          "sha256": "ac512ccdfc8518af29860858cce083aef5b4a3e7b6e939c4d4b5a9da35328531"
+        },
+        "reduce-1024-256-max.cu": {
+          "bytes": 1405,
+          "sha256": "e5f2168a7dba833a7154069f55b1137ceb678b3036831b91d98d524a6792085f"
+        },
+        "reduce-1024-256-sum.cu": {
+          "bytes": 1385,
+          "sha256": "a74a1b14e4b8269372a0f69664d6c89a8cbf94dfa5e902fa6286665650bd5855"
+        },
+        "reduce-256-128-max.cu": {
+          "bytes": 1339,
+          "sha256": "71db7faf26a2c5d02126d348bb974f44e88a602a6197a1db0ed2484d0752c8c3"
+        },
+        "reduce-256-128-sum.cu": {
+          "bytes": 1319,
+          "sha256": "845cd5f0b573e9d3981235944e06e1ee77313870d10dc5807da76efbf26f86fe"
+        },
+        "result.json": {
+          "bytes": 1797,
+          "sha256": "880f9bd623ed0b005d6af69e315ecde226ce922bfd94799f60dfa59cfb8ee24d"
+        },
+        "standalone.json": {
+          "bytes": 9694,
+          "sha256": "1129569c394fe973975d53cf5ecbfec74ae6a53ef14e6898c9e08ca4d8782e6d"
+        }
+      }
+    },
     "redux-base-a-v2": {
       "label": "redux-base-a-v2",
       "started_utc": "2026-11-04T01:38:46.908737+00:00",
@@ -8969,6 +11439,150 @@
         "result.json": {
           "bytes": 1724,
           "sha256": "18a972fe9b8404c9b08198be4f5baa0e9a67aca5e63d188493e339cc3f7001e3"
+        },
+        "standalone.json": {
+          "bytes": 799,
+          "sha256": "ab4e8f28a0bbda3d204cba7b05182c619d35f4730a31c7e0264f58fa676483f1"
+        }
+      }
+    },
+    "redux-base-b-v2": {
+      "label": "redux-base-b-v2",
+      "started_utc": "2026-11-04T02:00:34.074029+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-redux-base-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/redux-base-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/redux-base-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "redux"
+      ],
+      "before_memory_bytes": 123268280320,
+      "start_hottest_c": 49.4,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:39.081954+00:00",
+      "memory_aborted": false,
+      "output_sha256": "c07ee4b68e3496970268bc4206d166fed4c5b6bc64b8011add4758b66562e822",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "sm_121a-float32",
+          "status": "passed",
+          "details": {
+            "arch": "sm_121a",
+            "dtype": "float32",
+            "redux_instructions": 0,
+            "shuffle_instructions": 5
+          }
+        },
+        {
+          "name": "sm_121a-int32",
+          "status": "passed",
+          "details": {
+            "arch": "sm_121a",
+            "dtype": "int32",
+            "redux_instructions": 1,
+            "shuffle_instructions": 0
+          }
+        },
+        {
+          "name": "sm_103a-float32",
+          "status": "passed",
+          "details": {
+            "arch": "sm_103a",
+            "dtype": "float32",
+            "redux_instructions": 1,
+            "shuffle_instructions": 0
+          }
+        },
+        {
+          "name": "sm_103a-int32",
+          "status": "passed",
+          "details": {
+            "arch": "sm_103a",
+            "dtype": "int32",
+            "redux_instructions": 1,
+            "shuffle_instructions": 0
+          }
+        }
+      ],
+      "min_host_available_bytes": 122579517440,
+      "max_hottest_c": 54.1,
+      "files": {
+        "command.json": {
+          "bytes": 1541,
+          "sha256": "fea6d9e8e95b94136cc33c67a5fd431bc2705050c9dd77539e6700f636313cbc"
+        },
+        "memory.jsonl": {
+          "bytes": 480,
+          "sha256": "86eee00a1519d05d245c3cb84b75b9bb85b1eb9740727850cd1e3230ae44d419"
+        },
+        "output.txt": {
+          "bytes": 790,
+          "sha256": "c07ee4b68e3496970268bc4206d166fed4c5b6bc64b8011add4758b66562e822"
+        },
+        "redux-sm_103a-float32.ptx": {
+          "bytes": 2961,
+          "sha256": "c9c3aa76737c3d583951c1474da69cedee0e9603a604ff25d46706ecb812b9b2"
+        },
+        "redux-sm_103a-int32.ptx": {
+          "bytes": 2963,
+          "sha256": "7b544f8101304ef87fa4be9da5bda7ab12ce1554954375a49a0959dba8acf055"
+        },
+        "redux-sm_121a-float32.ptx": {
+          "bytes": 7137,
+          "sha256": "345e0668a1d991875979d9b6c6413298c2a43832b9f8cbb912da2e978a77f92c"
+        },
+        "redux-sm_121a-int32.ptx": {
+          "bytes": 2962,
+          "sha256": "282e2045ffc439453333ede507106e78da20ab763a21c8afe9b1e564c50f35ee"
+        },
+        "result.json": {
+          "bytes": 1724,
+          "sha256": "933b66a8e60ac65d33eebea20f6ea77b951cf9230b5fb5a16c1a7d2daaef5bb2"
         },
         "standalone.json": {
           "bytes": 799,
@@ -9343,6 +11957,125 @@
         }
       }
     },
+    "ws3537-base-b-v2": {
+      "label": "ws3537-base-b-v2",
+      "started_utc": "2026-11-04T01:59:49.003379+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-ws3537-base-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/ws3537-base-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/ws3537-base-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "before_memory_bytes": 123584585728,
+      "start_hottest_c": 49.3,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 1,
+      "ended_utc": "2026-11-04T01:59:56.012995+00:00",
+      "memory_aborted": false,
+      "output_sha256": "5f16a060765fce81db67506c13f530e2dd3221f0b534b02c22a1908f2f6cd6a3",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "test_ws_generic_stage_reads_fence_before_release",
+          "status": "failed",
+          "error": "Traceback (most recent call last):\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 23, in check\n    details = function()\n              ^^^^^^^^^^\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 347, in <lambda>\n    check(name, lambda name=name: upstream_test(3537, \"testing/python/issue/test_tilelang_issue_3529.py\", name))\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 77, in upstream_test\n    getattr(module, name)()\n  File \"/review/variants/pr3537/testing/python/issue/test_tilelang_issue_3529.py\", line 114, in test_ws_generic_stage_reads_fence_before_release\n    assert all(_consumer_releases_fenced(src)), src\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: #if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940\n#define _tl_orig_alignas alignas\n#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)\n#include <cuda.h>\n#undef alignas\n#define alignas _tl_orig_alignas\n#endif\n#include <tl_templates/cuda/intrin.h>\n#include <tl_templates/cuda/barrier.h>\n#include <tl_templates/cuda/copy_sm90.h>\n#include <tl_templates/cuda/reduce.h>\n#include <tl_templates/cuda/scan.h>\n#include <tl_templates/cuda/ldsm.h>\n#include <tl_templates/cuda/threadblock_swizzle.h>\n#include <tl_templates/cuda/debug.h>\n#ifdef ENABLE_BF16\n#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>\n#endif\n\nextern \"C\" __global__ void exp_sum_kernel(const float* __restrict__ M, float* __restrict__ P, const bfloat16_t* __restrict__ R, const float* __restrict__ X);\nextern \"C\" __global__ void __launch_bounds__(256, 1) exp_sum_kernel(const float* __restrict__ M, float* __restrict__ P, const bfloat16_t* __restrict__ R, const float* __restrict__ X) {\n  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];\n  void* M_s = ((void*)((char*)buf_dyn_shmem + 0));\n  void* workspace = ((void*)((char*)buf_dyn_shmem + 128));\n  void* X_s = ((void*)((char*)buf_dyn_shmem + 1024));\n  void* R_s = ((void*)((char*)buf_dyn_shmem + 25600));\n  __shared__ __align__(16) uint64_t mbarrier_mem[7];\n  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);\n  float acc[16];\n  float e[16];\n  float part[16];\n  if (tl::tl_shuffle_elect<0>()) {\n    mbarrier[0].init(1);\n    mbarrier[1].init(1);\n    mbarrier[2].init(1);\n    mbarrier[3].init(128);\n    mbarrier[4].init(128);\n    mbarrier[5].init(128);\n    mbarrier[6].init(1);\n  }\n  tl::fence_barrier_init();\n  __syncthreads();\n  if (tl::tl_shuffle_elect<256>()) {\n    mbarrier[6].arrive_and_expect_tx(128);\n    tl::tma_load((&(((float*)M_s)[0])), (&(M[0])), mbarrier[6], 128);\n  }\n  if (((int)threadIdx.x) < 128) {\n    tl::warpgroup_reg_dealloc<24>();\n    if (((int)threadIdx.x) < 32) {\n      for (int kk = 0; kk < 4; ++kk) {\n        mbarrier[((kk % 3) + 3)].wait(((kk / 3) ^ 1));\n        if (tl::tl_shuffle_elect<32>()) {\n          mbarrier[(kk % 3)].expect_transaction(8192);\n          tl::tma_load((&(((float*)X_s)[((kk % 3) * 2048)])), (&(X[((((int)blockIdx.y) * 8192) + (kk * 2048))])), mbarrier[(kk % 3)], 8192);\n          mbarrier[(kk % 3)].arrive_and_expect_tx(4096);\n          tl::tma_load((&(((bfloat16_t*)R_s)[((kk % 3) * 2048)])), (&(R[((((int)blockIdx.y) * 8192) + (kk * 2048))])), mbarrier[(kk % 3)], 4096);\n        }\n      }\n    }\n  } else {\n    tl::warpgroup_reg_alloc<240>();\n    #pragma unroll\n    for (int i = 0; i < 4; ++i) {\n      float broadcast_var = 0x0p+0f/*0.000000e+00*/;\n      *(float4*)(acc + (i * 4)) = make_float4(broadcast_var, broadcast_var, broadcast_var, broadcast_var);\n    }\n    for (int kk_1 = 0; kk_1 < 4; ++kk_1) {\n      if (kk_1 == 0) {\n        mbarrier[6].wait(0);\n      }\n      mbarrier[(kk_1 % 3)].wait((kk_1 / 3));\n      tl::__sync_thread_partial(3, 128);\n      #pragma unroll\n      for (int i_1 = 0; i_1 < 16; ++i_1) {\n        e[i_1] = expf((((((float*)X_s)[((((((kk_1 % 3) * 2048) + ((((int)threadIdx.x) & 63) * 32)) + (i_1 * 2)) + (((int)threadIdx.x) >> 6)) - 2)] * ((float)((bfloat16_t*)R_s)[((((((kk_1 % 3) * 2048) + ((((int)threadIdx.x) & 63) * 32)) + (i_1 * 2)) + (((int)threadIdx.x) >> 6)) - 2)])) / 0x1.6a09e667f3bcdp+3f/*1.131371e+01*/) - ((float*)M_s)[(((i_1 * 2) + (((int)threadIdx.x) >> 6)) - 2)]));\n      }\n      mbarrier[((kk_1 % 3) + 3)].arrive();\n      #pragma unroll\n      for (int i_2 = 0; i_2 < 16; ++i_2) {\n        part[i_2] = 0x0p+0f/*0.000000e+00*/;\n        part[i_2] = (part[i_2] + e[i_2]);\n        tl::__sync_thread_partial(3, 128);\n        part[i_2] = tl::AllReduce<tl::SumOp, 64, 1, 128, tl::NamedBarrier<128>>::run(part[i_2], (&(((float*)workspace)[0])));\n      }\n      #pragma unroll\n      for (int i_3 = 0; i_3 < 4; ++i_3) {\n        float4 __1;\n          float4 v_ = *(float4*)(acc + (i_3 * 4));\n          float4 v__1 = *(float4*)(part + (i_3 * 4));\n          *(float2*)(&(__1.x)) = tl::add2(*(float2*)(&(v_.x)), *(float2*)(&(v__1.x)));\n          *(float2*)(&(__1.z)) = tl::add2(*(float2*)(&(v_.z)), *(float2*)(&(v__1.z)));\n        *(float4*)(acc + (i_3 * 4)) = __1;\n      }\n    }\n    if ((((int)threadIdx.x) % 64) == 0) {\n      #pragma unroll\n      for (int i_4 = 0; i_4 < 16; ++i_4) {\n        P[((((((int)blockIdx.y) * 32) + (i_4 * 2)) + (((int)threadIdx.x) >> 6)) - 2)] = acc[i_4];\n      }\n    }\n  }\n}\n\n\n"
+        },
+        {
+          "name": "test_ws_mma_sync_stage_reads_fence_before_release",
+          "status": "failed",
+          "error": "Traceback (most recent call last):\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 23, in check\n    details = function()\n              ^^^^^^^^^^\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 347, in <lambda>\n    check(name, lambda name=name: upstream_test(3537, \"testing/python/issue/test_tilelang_issue_3529.py\", name))\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py\", line 77, in upstream_test\n    getattr(module, name)()\n  File \"/review/variants/pr3537/testing/python/issue/test_tilelang_issue_3529.py\", line 124, in test_ws_mma_sync_stage_reads_fence_before_release\n    assert all(_consumer_releases_fenced(src)), src\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: #if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940\n#define _tl_orig_alignas alignas\n#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)\n#include <cuda.h>\n#undef alignas\n#define alignas _tl_orig_alignas\n#endif\n#include <tl_templates/cuda/instruction/mma.h>\n#include <tl_templates/cuda/intrin.h>\n#include <tl_templates/cuda/barrier.h>\n#include <tl_templates/cuda/copy_sm90.h>\n#include <tl_templates/cuda/reduce.h>\n#include <tl_templates/cuda/scan.h>\n#include <tl_templates/cuda/ldsm.h>\n#include <tl_templates/cuda/threadblock_swizzle.h>\n#include <tl_templates/cuda/debug.h>\n#ifdef ENABLE_BF16\n#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>\n#endif\n\nextern \"C\" __global__ void main_kernel(__grid_constant__ const CUtensorMap A_desc, __grid_constant__ const CUtensorMap B_desc, half_t* __restrict__ C);\nextern \"C\" __global__ void __launch_bounds__(256, 1) main_kernel(__grid_constant__ const CUtensorMap A_desc, __grid_constant__ const CUtensorMap B_desc, half_t* __restrict__ C) {\n  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];\n  void* A_shared = ((void*)((char*)buf_dyn_shmem + 0));\n  void* B_shared = ((void*)((char*)buf_dyn_shmem + 49152));\n  __shared__ __align__(16) uint64_t mbarrier_mem[6];\n  auto mbarrier = reinterpret_cast<Barrier*>(mbarrier_mem);\n  float C_local[128];\n  if (tl::tl_shuffle_elect<0>()) {\n    tl::prefetch_tma_descriptor(A_desc);\n    tl::prefetch_tma_descriptor(B_desc);\n  }\n  if (tl::tl_shuffle_elect<0>()) {\n    mbarrier[0].init(1);\n    mbarrier[1].init(1);\n    mbarrier[2].init(1);\n    mbarrier[3].init(128);\n    mbarrier[4].init(128);\n    mbarrier[5].init(128);\n  }\n  tl::fence_barrier_init();\n  __syncthreads();\n  if (((int)threadIdx.x) < 128) {\n    tl::warpgroup_reg_dealloc<24>();\n    if (((int)threadIdx.x) < 32) {\n      for (int ko = 0; ko < 8; ++ko) {\n        mbarrier[((ko % 3) + 3)].wait((((ko % 6) / 3) ^ 1));\n        if (tl::tl_shuffle_elect<32>()) {\n          mbarrier[(ko % 3)].expect_transaction(16384);\n          tl::tma_load(A_desc, mbarrier[(ko % 3)], (&(((half_t*)A_shared)[((ko % 3) * 8192)])), (ko * 64), (((int)blockIdx.y) * 128));\n          mbarrier[(ko % 3)].arrive_and_expect_tx(16384);\n          #pragma unroll\n          for (int i = 0; i < 2; ++i) {\n            tl::tma_load(B_desc, mbarrier[(ko % 3)], (&(((half_t*)B_shared)[(((ko % 3) * 8192) + (i * 4096))])), ((((int)blockIdx.x) * 128) + (i * 64)), (ko * 64));\n          }\n        }\n      }\n    }\n  } else {\n    tl::warpgroup_reg_alloc<240>();\n    #pragma unroll\n    for (int i_1 = 0; i_1 < 32; ++i_1) {\n      float broadcast_var = 0x0p+0f/*0.000000e+00*/;\n      *(float4*)(C_local + (i_1 * 4)) = make_float4(broadcast_var, broadcast_var, broadcast_var, broadcast_var);\n    }\n    for (int ko_1 = 0; ko_1 < 8; ++ko_1) {\n      mbarrier[(ko_1 % 3)].wait(((ko_1 % 6) / 3));\n      {\n        half_t A_local[32];\n        half_t B_local[32];\n        for (int ki = 0; ki < 4; ++ki) {\n          #pragma unroll\n          for (int i_2 = 0; i_2 < 4; ++i_2) {\n            tl::ptx_ldmatrix_x4((&(((half_t*)A_shared)[((((((((ko_1 % 3) * 8192) + (((((int)threadIdx.x) & 63) >> 5) * 4096)) + (i_2 * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + (ki >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (ki & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8))])), (&(A_local[(i_2 * 8)])));\n          }\n          #pragma unroll\n          for (int i_3 = 0; i_3 < 4; ++i_3) {\n            tl::ptx_ldmatrix_x4_trans((&(((half_t*)B_shared)[((((((((ko_1 % 3) * 8192) + (((((int)threadIdx.x) & 127) >> 6) * 4096)) + (ki * 1024)) + ((((int)threadIdx.x) & 15) * 64)) + (((((((int)threadIdx.x) & 7) >> 2) + (i_3 >> 1)) & 1) * 32)) + (((((((int)threadIdx.x) & 3) >> 1) + (i_3 & 1)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + (((int)threadIdx.x) & 1)) & 1) * 8))])), (&(B_local[(i_3 * 8)])));\n          }\n          for (int i_4 = 0; i_4 < 4; ++i_4) {\n            for (int j = 0; j < 4; ++j) {\n              tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(C_local + ((i_4 * 32) + (j * 8))), reinterpret_cast<const unsigned*>(A_local + (i_4 * 8)), reinterpret_cast<const unsigned*>(B_local + (j * 8)));\n              tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(C_local + (((i_4 * 32) + (j * 8)) + 4)), reinterpret_cast<const unsigned*>(A_local + (i_4 * 8)), reinterpret_cast<const unsigned*>(B_local + ((j * 8) + 4)));\n            }\n          }\n        }\n      }\n      mbarrier[((ko_1 % 3) + 3)].arrive();\n    }\n    #pragma unroll\n    for (int i_5 = 0; i_5 < 64; ++i_5) {\n      half_t C_local_cast[2];\n      uint1 __1;\n      float2 v_ = *(float2*)(C_local + (i_5 * 2));\n      ((half2*)(&__1))[0] = __float22half2_rn(((float2*)(&v_))[0]);\n      *(uint1*)(C_local_cast + 0) = __1;\n      *(uint1*)(C + ((((((((((((int)blockIdx.y) * 65536) + (((((int)threadIdx.x) & 63) >> 5) * 32768)) + ((i_5 >> 4) * 8192)) + ((i_5 & 1) * 4096)) + (((((int)threadIdx.x) & 31) >> 2) * 512)) + (((int)blockIdx.x) * 128)) + ((((int)threadIdx.x) >> 6) * 64)) + (((i_5 & 15) >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) - 128)) = *(uint1*)(C_local_cast + 0);\n    }\n  }\n}\n\n\n"
+        },
+        {
+          "name": "test_ws_generic_stage_reads_fast_math_correctness",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_3529.py::test_ws_generic_stage_reads_fast_math_correctness",
+            "compiled_kernels": 1,
+            "forced_ws_off": false
+          }
+        }
+      ],
+      "min_host_available_bytes": 122624782336,
+      "max_hottest_c": 56.6,
+      "files": {
+        "command.json": {
+          "bytes": 1546,
+          "sha256": "281c244e8266188faf1719958dd4353212d0b71918b39767b697783f1fab579b"
+        },
+        "memory.jsonl": {
+          "bytes": 672,
+          "sha256": "1c91e8642ed3ea01bcdbaa18f3e2bb7536129ce5e14394c4f388da08fa61f0f5"
+        },
+        "output.txt": {
+          "bytes": 13287,
+          "sha256": "5f16a060765fce81db67506c13f530e2dd3221f0b534b02c22a1908f2f6cd6a3"
+        },
+        "result.json": {
+          "bytes": 1729,
+          "sha256": "1e8db24ec003997ffe47951442cdd5e935b795026bf26ffda6fb2141a38a5eef"
+        },
+        "standalone.json": {
+          "bytes": 12411,
+          "sha256": "d66a835607d0220c895269a7d9430f1143cf9efbff329f8ec666f1ffe9d543fd"
+        },
+        "test_ws_generic_stage_reads_fast_math_correctness-ws-off-False-0.cu": {
+          "bytes": 4429,
+          "sha256": "e047d311abfbce9d632a1820fe3a70dd211da13049ea18f3711a56cbc6ae2166"
+        },
+        "test_ws_generic_stage_reads_fence_before_release-ws-off-False-0.cu": {
+          "bytes": 4429,
+          "sha256": "e047d311abfbce9d632a1820fe3a70dd211da13049ea18f3711a56cbc6ae2166"
+        },
+        "test_ws_mma_sync_stage_reads_fence_before_release-ws-off-False-0.cu": {
+          "bytes": 5324,
+          "sha256": "b0dca08d82b17bafbec3ccdd0634feb45c7511e0beab9561bf3b298cfdc9b8b8"
+        }
+      }
+    },
     "ws3537-pr3537-a-v2": {
       "label": "ws3537-pr3537-a-v2",
       "started_utc": "2026-11-04T01:38:08.854356+00:00",
@@ -9451,6 +12184,133 @@
         "result.json": {
           "bytes": 1741,
           "sha256": "eafac1e2fca7eb0d5194045db2e2c0a546ae19e03982042aa80e62d10694562e"
+        },
+        "standalone.json": {
+          "bytes": 916,
+          "sha256": "0462577b62344b0c86e034924062b22ab32a70b22d594e3886937167a24bd8f7"
+        },
+        "test_ws_generic_stage_reads_fast_math_correctness-ws-off-False-0.cu": {
+          "bytes": 4460,
+          "sha256": "c1c7e540d29b85fd20d4ee0da2b696dc7f044d5a137329094c7c2e8f04c8121a"
+        },
+        "test_ws_generic_stage_reads_fence_before_release-ws-off-False-0.cu": {
+          "bytes": 4460,
+          "sha256": "c1c7e540d29b85fd20d4ee0da2b696dc7f044d5a137329094c7c2e8f04c8121a"
+        },
+        "test_ws_mma_sync_stage_reads_fence_before_release-ws-off-False-0.cu": {
+          "bytes": 5355,
+          "sha256": "ca9c0983d56be98bc0b8ec4ef4ff31905972a2b3687fbc17efd7f430ebec2759"
+        }
+      }
+    },
+    "ws3537-pr3537-b-v2": {
+      "label": "ws3537-pr3537-b-v2",
+      "started_utc": "2026-11-04T01:59:56.014241+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/pr3537",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-ws3537-pr3537-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/ws3537-pr3537-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/ws3537-pr3537-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/pr3537",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "before_memory_bytes": 123702517760,
+      "start_hottest_c": 49.7,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T02:00:03.022642+00:00",
+      "memory_aborted": false,
+      "output_sha256": "d4e0b9634ef7ed98f9de310023692b84cbd26d93e74e51b6ef22171c8c5619de",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "test_ws_generic_stage_reads_fence_before_release",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_3529.py::test_ws_generic_stage_reads_fence_before_release",
+            "compiled_kernels": 1,
+            "forced_ws_off": false
+          }
+        },
+        {
+          "name": "test_ws_mma_sync_stage_reads_fence_before_release",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_3529.py::test_ws_mma_sync_stage_reads_fence_before_release",
+            "compiled_kernels": 1,
+            "forced_ws_off": false
+          }
+        },
+        {
+          "name": "test_ws_generic_stage_reads_fast_math_correctness",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_3529.py::test_ws_generic_stage_reads_fast_math_correctness",
+            "compiled_kernels": 1,
+            "forced_ws_off": false
+          }
+        }
+      ],
+      "min_host_available_bytes": 122482475008,
+      "max_hottest_c": 54.9,
+      "files": {
+        "command.json": {
+          "bytes": 1558,
+          "sha256": "d89b81c2ddaf64deb1126271339f75822f765eb76b24f39ff16088b5f12f4f01"
+        },
+        "memory.jsonl": {
+          "bytes": 672,
+          "sha256": "9cb4488bf47d5417fec33c6816bf2c2d1d4bea2f1023be33ed785cd171c4a621"
+        },
+        "output.txt": {
+          "bytes": 1748,
+          "sha256": "d4e0b9634ef7ed98f9de310023692b84cbd26d93e74e51b6ef22171c8c5619de"
+        },
+        "result.json": {
+          "bytes": 1741,
+          "sha256": "4437f2332675eda585d8e4972dbb26af60e233b21ac332293b5ffa6b93b6b21d"
         },
         "standalone.json": {
           "bytes": 916,
@@ -9595,6 +12455,150 @@
         }
       }
     },
+    "ws3661-base-b-v2": {
+      "label": "ws3661-base-b-v2",
+      "started_utc": "2026-11-04T01:59:25.975386+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/base",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-ws3661-base-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/ws3661-base-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/ws3661-base-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/base",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "before_memory_bytes": 123852808192,
+      "start_hottest_c": 46.3,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T01:59:34.986401+00:00",
+      "memory_aborted": false,
+      "output_sha256": "39fb0568cb6fc694c300f6a0cadf4139227b5387dd45fc98300830e41b7e48e1",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "ws-disabled-False",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_ws_simt_copy_full_producer_extent.py::test_ws_publishes_synchronous_fp8_conversion",
+            "compiled_kernels": 1,
+            "forced_ws_off": false,
+            "timing": {
+              "mean_us": 164.59473503960504,
+              "ci95_us": 0.8495668593116168,
+              "samples_us": [
+                165.7357177734375,
+                163.77197265625,
+                165.5821075439453,
+                163.8098907470703,
+                163.77244567871094,
+                163.7833251953125,
+                164.4982452392578,
+                163.76284790039062,
+                166.6360626220703
+              ]
+            }
+          }
+        },
+        {
+          "name": "ws-disabled-True",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_ws_simt_copy_full_producer_extent.py::test_ws_publishes_synchronous_fp8_conversion",
+            "compiled_kernels": 1,
+            "forced_ws_off": true,
+            "timing": {
+              "mean_us": 160.71663750542535,
+              "ci95_us": 0.5970958333642086,
+              "samples_us": [
+                162.20982360839844,
+                161.03091430664062,
+                160.2348175048828,
+                161.7265625,
+                160.1260223388672,
+                160.1427764892578,
+                160.13792419433594,
+                160.59117126464844,
+                160.24972534179688
+              ]
+            }
+          }
+        }
+      ],
+      "min_host_available_bytes": 122335830016,
+      "max_hottest_c": 57.4,
+      "files": {
+        "command.json": {
+          "bytes": 1546,
+          "sha256": "fc9510967dba5479b5ef2736d732e319360340157b679c327620ff207fe970da"
+        },
+        "memory.jsonl": {
+          "bytes": 864,
+          "sha256": "a38af691bffc5deff3a0a85a8bdbb0d2a2cf300f45ee6b49af5e81c0f7053a7a"
+        },
+        "output.txt": {
+          "bytes": 1723,
+          "sha256": "39fb0568cb6fc694c300f6a0cadf4139227b5387dd45fc98300830e41b7e48e1"
+        },
+        "result.json": {
+          "bytes": 1729,
+          "sha256": "e83d5979c1b6e87264b6e32020a71b9a570c55c6e510a40a31477247d9a71b77"
+        },
+        "standalone.json": {
+          "bytes": 1392,
+          "sha256": "6856e0a4f201337e42915a0d49128c21557afcda4a61417e4e28c0deba276ddc"
+        },
+        "test_ws_publishes_synchronous_fp8_conversion-ws-off-False-0.cu": {
+          "bytes": 5708,
+          "sha256": "e1031565a367dedc2508c6578a4cafae15dea98dbcdd34faea6b569f50242fec"
+        },
+        "test_ws_publishes_synchronous_fp8_conversion-ws-off-True-0.cu": {
+          "bytes": 8109,
+          "sha256": "8b127f560f69fc8e70d307bb8fbf0cd873d40a35db167ccf8f73b9d75c8799ab"
+        }
+      }
+    },
     "ws3661-pr3661-a-v2": {
       "label": "ws3661-pr3661-a-v2",
       "started_utc": "2026-11-04T01:37:47.828442+00:00",
@@ -9728,6 +12732,150 @@
         "standalone.json": {
           "bytes": 1393,
           "sha256": "ba0976db49b5e56af284b625033c7acf23bc436bd4e4424e1ce08e4f6eff2acf"
+        },
+        "test_ws_publishes_synchronous_fp8_conversion-ws-off-False-0.cu": {
+          "bytes": 5737,
+          "sha256": "6dd2fe198f7f38434402177319c51865f401548281c139549ead0913ea641f28"
+        },
+        "test_ws_publishes_synchronous_fp8_conversion-ws-off-True-0.cu": {
+          "bytes": 8109,
+          "sha256": "8b127f560f69fc8e70d307bb8fbf0cd873d40a35db167ccf8f73b9d75c8799ab"
+        }
+      }
+    },
+    "ws3661-pr3661-b-v2": {
+      "label": "ws3661-pr3661-b-v2",
+      "started_utc": "2026-11-04T01:59:34.988067+00:00",
+      "image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+      "source": "variants/pr3661",
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "tl-review-ws3661-pr3661-b-v2",
+        "--gpus",
+        "all",
+        "--network",
+        "none",
+        "--memory",
+        "24g",
+        "--memory-swap",
+        "24g",
+        "--shm-size",
+        "2g",
+        "--ulimit",
+        "core=0",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104,target=/review,readonly",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/runs/ws3661-pr3661-b-v2,target=/out",
+        "--mount",
+        "type=bind,source=/home/chris/spark-lab/tilelang-review-20261104/cache/ws3661-pr3661-b-v2,target=/cache",
+        "--env",
+        "PYTHONPATH=/review/variants/pr3661",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--env",
+        "TILELANG_CACHE_DIR=/cache/tilelang",
+        "--env",
+        "CUDA_CACHE_PATH=/cache/driver",
+        "--env",
+        "VLLM_PLUGINS=",
+        "--env",
+        "NO_GIT_VERSION=1",
+        "--workdir",
+        "/out",
+        "--entrypoint",
+        "/usr/bin/timeout",
+        "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+        "300",
+        "python3",
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "before_memory_bytes": 123625291776,
+      "start_hottest_c": 54.7,
+      "independent_sp8_authorized": true,
+      "dgx1_hold_modified": false,
+      "serving_operations": [],
+      "exit_code": 0,
+      "ended_utc": "2026-11-04T01:59:44.000491+00:00",
+      "memory_aborted": false,
+      "output_sha256": "d5abcbcfc18c8c718dd1fe79d78511dc5f039f98430d7a3a0929f560ad67bcb1",
+      "valid_for_comparison": true,
+      "checks": [
+        {
+          "name": "ws-disabled-False",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_ws_simt_copy_full_producer_extent.py::test_ws_publishes_synchronous_fp8_conversion",
+            "compiled_kernels": 1,
+            "forced_ws_off": false,
+            "timing": {
+              "mean_us": 164.33035956488715,
+              "ci95_us": 0.7181752266140444,
+              "samples_us": [
+                166.60800170898438,
+                164.044921875,
+                164.414306640625,
+                164.79852294921875,
+                163.87059020996094,
+                163.6880645751953,
+                163.69366455078125,
+                164.1868133544922,
+                163.66835021972656
+              ]
+            }
+          }
+        },
+        {
+          "name": "ws-disabled-True",
+          "status": "passed",
+          "details": {
+            "upstream_test": "testing/python/issue/test_tilelang_issue_ws_simt_copy_full_producer_extent.py::test_ws_publishes_synchronous_fp8_conversion",
+            "compiled_kernels": 1,
+            "forced_ws_off": true,
+            "timing": {
+              "mean_us": 160.5308363172743,
+              "ci95_us": 0.8658854520523169,
+              "samples_us": [
+                163.37782287597656,
+                160.64886474609375,
+                160.166015625,
+                160.29458618164062,
+                160.52505493164062,
+                159.76109313964844,
+                159.7406005859375,
+                159.73939514160156,
+                160.5240936279297
+              ]
+            }
+          }
+        }
+      ],
+      "min_host_available_bytes": 122010427392,
+      "max_hottest_c": 59.6,
+      "files": {
+        "command.json": {
+          "bytes": 1558,
+          "sha256": "1aad18d33841c9bf176d770b32332311d4f311061cd904d607cf4e1cef9ae268"
+        },
+        "memory.jsonl": {
+          "bytes": 864,
+          "sha256": "4d628e440b4cc64ab18caa130e053ce72269d0d3b7fe5bfac9627cca8d8123e2"
+        },
+        "output.txt": {
+          "bytes": 1729,
+          "sha256": "d5abcbcfc18c8c718dd1fe79d78511dc5f039f98430d7a3a0929f560ad67bcb1"
+        },
+        "result.json": {
+          "bytes": 1741,
+          "sha256": "3919ac2b497cbee2ba39053cae2b5df904302f6313fa942c4f32710c67f93543"
+        },
+        "standalone.json": {
+          "bytes": 1394,
+          "sha256": "0698e504145ff2620d23a4805b0106f9f8f7b3075014c3d1c91ae5b671b2bee2"
         },
         "test_ws_publishes_synchronous_fp8_conversion-ws-off-False-0.cu": {
           "bytes": 5737,

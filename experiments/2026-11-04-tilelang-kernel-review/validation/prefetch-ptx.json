@@ -1,0 +1,38 @@
+[
+  {
+    "run": "a",
+    "policy": "None",
+    "instruction": "prefetch.global.L2 [",
+    "passed": true
+  },
+  {
+    "run": "a",
+    "policy": "evict_normal",
+    "instruction": "prefetch.global.L2::evict_normal [",
+    "passed": true
+  },
+  {
+    "run": "a",
+    "policy": "evict_last",
+    "instruction": "prefetch.global.L2::evict_last [",
+    "passed": true
+  },
+  {
+    "run": "b",
+    "policy": "None",
+    "instruction": "prefetch.global.L2 [",
+    "passed": true
+  },
+  {
+    "run": "b",
+    "policy": "evict_normal",
+    "instruction": "prefetch.global.L2::evict_normal [",
+    "passed": true
+  },
+  {
+    "run": "b",
+    "policy": "evict_last",
+    "instruction": "prefetch.global.L2::evict_last [",
+    "passed": true
+  }
+]

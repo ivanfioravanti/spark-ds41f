@@ -26,9 +26,11 @@ cases separate; record an interaction explicitly if a combined fix is needed.
 ## Evidence status
 
 The native base compiler and all ten independent variants built on sp8. There
-are 49 completed, valid test processes in the current receipt snapshot. The
-remaining repeat processes and clamp edge checks are queued behind other sp8
-work. This is standalone screening, not serving qualification or promotion.
+are **66 completed, valid test processes**, with all planned repeats and clamp
+edge checks complete. Another 28 invalid setup processes are retained and
+excluded from comparisons. This is standalone screening, not serving
+qualification or promotion. Our test containers and local hold are removed;
+foreign reservations and requests are preserved.
 
 The carried MXFP8, MXFP4, NVFP4 and IKET suites passed **203 tests in each of two
 fresh processes**. Each process skipped two tests restricted to SM120. All four
@@ -39,23 +41,23 @@ also passed twice on the base and each JIT port with its default settings.
 
 | Item | Standalone evidence | Consequence for this stack |
 |---|---|---|
-| [#3661](https://github.com/tile-ai/tilelang/pull/3661), synchronous producer stores | The base produces wrong BF16 GEMM results with warp specialization. The port passes the 200-launch poisoned-output reproducer; disabling specialization also passes. In the first timing process, fixed specialization is 165.34 ± 0.50 µs versus 161.58 ± 0.54 µs disabled. | A useful correctness fix. Keep our specialization workaround until an actual WO-A kernel shows a benefit. Repeat timing pending. |
-| [#3715](https://github.com/tile-ai/tilelang/pull/3715), crosswarp reduction | Max outputs retain their bits. FP32 sum changes 43/64 and 47/64 output rows at widths 256 and 1024; maximum differences are 32 and 14 ULP. Both versions meet the numerical tolerance. Larger reductions improve in the first process, while smaller cases are mixed. | Already in the refresh. Record the addition-order change and retain the numerical/quality gate. Repeat timing pending. |
+| [#3661](https://github.com/tile-ai/tilelang/pull/3661), synchronous producer stores | The base produces wrong BF16 GEMM results with warp specialization in one process; the other process passes, demonstrating the race's intermittent nature. The port passes the 200-launch poisoned-output reproducer twice; disabling specialization also passes twice. Fixed specialization is 2.33% and 2.37% slower than disabled. | A useful correctness fix. Keep our specialization workaround until an actual WO-A kernel shows a benefit. |
+| [#3715](https://github.com/tile-ai/tilelang/pull/3715), crosswarp reduction | Max outputs retain their bits. FP32 sum changes 43/64 and 47/64 output rows at widths 256 and 1024; maximum differences are 32 and 14 ULP. Both versions meet tolerance and repeat their own output bits across processes. Width-1024 sum improves 4.25%/3.72%; width-256 max regresses 4.97%/1.77%. | Already in the refresh. Record the addition-order change and retain the numerical/quality gate; speed depends on the reduction shape and operation. |
 | [#3761](https://github.com/tile-ai/tilelang/pull/3761), partial barriers | All 98 thread-sync cases pass twice, split between CPU and GPU-required checks. Removing the change makes the pipeline reuse assertion see two IDs instead of one; ten other failures concern the combined-scope API. | Keep the already-merged change. This establishes barrier reuse, not a measured mHC or serving speedup. |
-| [#3605](https://github.com/tile-ai/tilelang/pull/3605), symmetric clamp | The first process matches all tested finite bits, NaN propagation and signed zeros for FP32, FP16 and BF16. The copy/clamp microkernel shows a small 16-bit improvement and a small FP32 regression. | Optional until measured inside our fused kernel. Additional NaN payload and subnormal checks, and repeat timing, are pending. |
+| [#3605](https://github.com/tile-ai/tilelang/pull/3605), symmetric clamp | Both processes match tested finite bits, subnormals, NaN propagation and signed zeros for FP32, FP16 and BF16. Short edge kernels preserve input NaN sign/payload in compare/select, while the new instruction canonicalizes them in all three dtypes, twice. The cache-hot microkernel improves FP16 1.53–3.42% and BF16 3.56–5.38%, but regresses FP32 2.06–4.01%. | Keep out of a strictly bit-preserving stack. Its NaN semantics must be accepted explicitly before use, and any speed claim needs our fused kernel's workload. |
 | [#3690](https://github.com/tile-ai/tilelang/pull/3690), shared alignment | **19/19 pass twice**. The base fails six assertions about unnecessarily large alignment. Exact swizzled TMA copy checks pass. | A sound smaller-alignment candidate; no speedup is established by these tests. |
 | [#3710](https://github.com/tile-ai/tilelang/pull/3710), cache disabling | **5/5 pass twice**; the base fails the fresh-wrapper-kernel assertion twice. Our default prepare/freeze check also passes twice. | Useful for trustworthy fresh compilation tests. The first port's missing import was corrected and its failed receipts retained. |
 | [#3190](https://github.com/tile-ai/tilelang/pull/3190), strict compilation | **40 CPU tests plus one real CUDA execution pass twice**. Our default prepare/freeze API works, but enabling strict mode after our `prepare` fails twice because the explicit-specialization registry is not populated. | A compatible default mode, with further integration required before enabling strict mode in our runtime. |
-| [#3537](https://github.com/tile-ai/tilelang/pull/3537), consumer release fence | The first process passes both generated-code fence assertions and the numerical fast-math reproducer. The base fails the fence assertions but passes that numerical workload. Hopper-only WGMMA cases are excluded. | A useful synchronization candidate. The missing fences are demonstrated; numerical failure was not observed in this sample. Repeat pending. |
+| [#3537](https://github.com/tile-ai/tilelang/pull/3537), consumer release fence | Both processes pass the two generated-code fence assertions and numerical fast-math reproducer. The base fails both fence assertions twice but passes that numerical workload twice. Hopper-only WGMMA cases are excluded. | A useful synchronization candidate. The missing fences are demonstrated; numerical failure was not observed in this sample. |
 | [#3568](https://github.com/tile-ai/tilelang/pull/3568), async waits | **3/3 transform regressions pass twice**; all three fail on the base. A same-stage consumer gets `wait<0>` instead of the base's insufficient `wait<1>`. | A clear compiler correctness candidate. No serving process is required to demonstrate it. |
-| [#3571](https://github.com/tile-ai/tilelang/issues/3571), linear layout with TMA | Explicit linear shared layout plus TMA gives wrong results in all three poisoned-output launches in the first process. Inferred/swizzled layouts and the TMA-disabled linear layout are exact. | Avoid that combination. Our carried vLLM patches do not request `make_linear_layout`. Repeat pending. |
-| [#3490](https://github.com/tile-ai/tilelang/pull/3490), prefetch API | All three policies compile, emit the requested PTX and preserve the input/output in the first process. | Useful API coverage; it supplies no demonstrated benefit over our existing bulk L2 prefetch. Repeat pending. |
-| [#3692](https://github.com/tile-ai/tilelang/pull/3692), FP32 redux | Generated SM121a PTX uses five shuffles and no FP32 redux. SM103a emits FP32 redux; integer max emits redux on both. SM103 code is never launched on sp8. | No FP32 hardware-reduction benefit for GB10. Repeat code generation pending. |
+| [#3571](https://github.com/tile-ai/tilelang/issues/3571), linear layout with TMA | Explicit linear shared layout plus TMA and warp specialization gives wrong results in both processes: the three launch mismatch counts are `[1024, 307, 12157]` and `[2978, 0, 26883]`. Inferred/swizzled layouts and the TMA-disabled linear layout are exact twice. | Avoid that combination. Our carried vLLM patches do not request `make_linear_layout`. |
+| [#3490](https://github.com/tile-ai/tilelang/pull/3490), prefetch API | All three policies compile, emit the requested PTX and preserve the input/output twice. All six saved PTX instruction checks pass. | Useful API coverage; it supplies no demonstrated benefit over our existing bulk L2 prefetch. |
+| [#3692](https://github.com/tile-ai/tilelang/pull/3692), FP32 redux | Both processes generate five shuffles and no FP32 redux for SM121a. SM103a emits FP32 redux; integer max emits redux on both. SM103 code is never launched on sp8. | No FP32 hardware-reduction benefit for GB10. |
 
 ## Workloads and interpretation
 
 `matrix-cpu-v3.json` and `matrix-gpu-v2.json` contain the exact argument vectors;
-`matrix-gpu-resume.json` contains the unfinished repeat and clamp-edge work.
+`matrix-gpu-resume.json` contains the completed repeat and clamp-edge batch.
 Each source is an independent patch against the unreleased compiler candidate.
 The warp-specialization flag comparison is an explicit interaction check on
 the same fixed compiler, rather than a cumulative stack of proposed fixes.
@@ -69,10 +71,11 @@ The upstream reproducers retain their pinned workloads in each port's source.
 Timing captures 100 launches in one CUDA graph and measures nine samples of
 ten replays. Values are µs/launch with a Student-t 95% interval within each
 fresh process. Clocks are not locked; intervals do not quantify serving or
-cross-process variability. The runner cools all exposed thermal sensors below
+cross-process variability. [timings.md](timings.md) records both processes and
+their intervals for every timing comparison. The runner cools all exposed thermal sensors below
 55 °C before each GPU process and records temperatures and host memory. The
 completed GPU runs kept at least 112.89 GiB host memory available; the native
-build kept at least 108.48 GiB. One sampled sensor reached 59 °C during a run.
+build kept at least 108.48 GiB. One sampled sensor reached 59.6 °C during a run.
 
 ## Reproducibility and boundaries
 

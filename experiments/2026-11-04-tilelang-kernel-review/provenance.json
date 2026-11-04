@@ -48,8 +48,14 @@
     {
       "name": "matrix-gpu-resume",
       "harness_commit": "1bdc00eb3852f7549aaa2533472a502efc343397",
+      "valid": false,
+      "status": "wait-only process replaced after prior reservation was released; no GPU launches"
+    },
+    {
+      "name": "matrix-gpu-resume-v2",
+      "harness_commit": "b813626b58b33098b3f990db28c2f48706088466",
       "valid": true,
-      "status": "queued at time of writing"
+      "status": "all 17 remaining processes complete"
     }
   ],
   "scale_selector_regressions": {
@@ -61,5 +67,21 @@
   "dgx_hold_modified": false,
   "authorization": "Owner: Yes, use sp8 independently; leaves foreign DGX hold untouched.",
   "cpu_builder_cleanup": "Stopped and removed only tilelang-review-build-20261104 after all CPU checks; source, libraries and receipts retained.",
-  "request_helper_commit": "e266589b1c59259bf08a3c332d3dc245a432077b"
+  "request_helper_commit": "e266589b1c59259bf08a3c332d3dc245a432077b",
+  "completion": {
+    "completed_utc": "2026-11-04T02:02:54.732862+00:00",
+    "remaining_repeat_jobs": 0,
+    "own_hold_present": false,
+    "own_containers": [],
+    "foreign_hold_present": true,
+    "foreign_request_preserved": true,
+    "foreign_request_sha256": "7ea1b99af3e142932130488d980c6430418babc212136ab736b01d0bcce493b8",
+    "serving_operations": [],
+    "dgx_hold_modified": false,
+    "deployment_harness_commit": "b813626b58b33098b3f990db28c2f48706088466",
+    "deployment_clean": true
+  },
+  "valid_processes": 66,
+  "invalid_setup_processes_retained": 28,
+  "evidence_sha256": "80383bc4374aeb2570651414147e533674ca84f749a86cb38b05d80a6cb66885"
 }
