@@ -1,0 +1,123 @@
+diff --git a/testing/python/cache/test_tilelang_without_kernel_cache.py b/testing/python/cache/test_tilelang_without_kernel_cache.py
+index 61036b86aa..c187d9d5e0 100644
+--- a/testing/python/cache/test_tilelang_without_kernel_cache.py
++++ b/testing/python/cache/test_tilelang_without_kernel_cache.py
+@@ -2,8 +2,12 @@
+ 
+ import pytest
+ 
++import tilelang
++import tilelang.language as T
+ import tilelang.testing
++from tilelang import env
+ from tilelang.env import CacheState
++from tilelang.jit import JITImpl
+ 
+ 
+ @pytest.fixture(autouse=True)
+@@ -45,5 +49,44 @@ def test_without_kernel_cache_restores_the_previous_state_after_the_body_reenabl
+     assert CacheState.is_enabled() is initially_enabled
+ 
+ 
++def test_without_kernel_cache_bypasses_the_jit_wrapper_caches(monkeypatch):
++    """A jit call inside the block compiles instead of reusing an earlier kernel."""
++    # The in-process caches are only consulted when the cache is enabled, so pin
++    # both switches instead of inheriting them from the caller's environment.
++    monkeypatch.setattr(vars(type(env))["TILELANG_DISABLE_CACHE"], "_forced_value", "0")
++    _set_cache_state(True)
++    compile_calls = []
++
++    def fake_compile(self, *args, **kwargs):
++        compile_calls.append(args)
++        return object()
++
++    monkeypatch.setattr(JITImpl, "compile", fake_compile)
++
++    @tilelang.jit(out_idx=-1, target="c")
++    def build(N):
++        @T.prim_func
++        def main(A: T.Tensor((N,), "float32"), B: T.Tensor((N,), "float32"), C: T.Tensor((N,), "float32")):
++            with T.Kernel(1, threads=128):
++                for i in T.Parallel(N):
++                    C[i] = A[i] + B[i]
++
++        return main
++
++    first = build(128)
++    assert build(128) is first
++    assert len(compile_calls) == 1
++
++    with tilelang.testing.without_kernel_cache():
++        fresh = build(128)
++
++    assert fresh is not first
++    assert len(compile_calls) == 2
++
++    assert build(128) is first
++    assert build(N=128) is first
++    assert len(compile_calls) == 2
++
++
+ if __name__ == "__main__":
+     tilelang.testing.main()
+diff --git a/tilelang/jit/__init__.py b/tilelang/jit/__init__.py
+index 3f19c3325e..0a23eae591 100644
+--- a/tilelang/jit/__init__.py
++++ b/tilelang/jit/__init__.py
+@@ -28,6 +28,7 @@
+ 
+ from tilelang.jit.kernel import JITKernel
+ from tilelang.cache import cached
++from tilelang.env import is_cache_enabled
+ from tilelang.utils.device import get_available_cpu_count
+ from os import path, makedirs
+ from logging import getLogger
+@@ -554,19 +555,25 @@ def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> _Ret:
+             self.mode = self._infer_jit_mode(*args, **kwargs)
+             self.func.set_mode(self.mode)
+ 
++        # A disabled cache must bypass the wrapper's in-process caches as well,
++        # otherwise a caller inside `without_kernel_cache()` can still receive a
++        # kernel that was compiled before the block started.
++        cache_enabled = is_cache_enabled()
++
+         call_form_key = None
+-        if self.is_lazy_mode() and self._can_use_call_form_cache(has_tune_params):
++        if cache_enabled and self.is_lazy_mode() and self._can_use_call_form_cache(has_tune_params):
+             kernel, call_form_key = self._call_form_cache.lookup(args, kwargs)
+             if kernel is not _CALL_FORM_CACHE_MISS:
+                 return kernel
+ 
+         key, kernel_args = self.func.parse_args(*args, **kwargs)
+-        kernel = self._kernel_cache.get(key, None)
++        kernel = self._kernel_cache.get(key, None) if cache_enabled else None
+         if kernel is None:
+             kernel = self.compile(*args, **kwargs)
+-            self._kernel_cache[key] = kernel
++            if cache_enabled:
++                self._kernel_cache[key] = kernel
+ 
+-        if call_form_key is not None and self.is_lazy_mode() and not kernel_args:
++        if cache_enabled and call_form_key is not None and self.is_lazy_mode() and not kernel_args:
+             self._call_form_cache.store(call_form_key, kernel)
+ 
+         # eager mode: execute kernel immediately and return result
+diff --git a/tilelang/testing/__init__.py b/tilelang/testing/__init__.py
+index b22ccca02a..d5812170a2 100644
+--- a/tilelang/testing/__init__.py
++++ b/tilelang/testing/__init__.py
+@@ -44,9 +44,11 @@ def without_kernel_cache():
+     cache carries neither, so such a test passes only on a cold cache unless it
+     opts out.
+ 
+-    The `@tilelang.jit` wrapper keeps its own kernel cache and consults it
+-    before `JITImpl.compile()` runs, so repeated jit calls are not covered
+-    here. A cache state the caller had already disabled is restored on exit.
++    The `@tilelang.jit` wrapper keeps its own in-process caches and consults
++    them before `JITImpl.compile()` runs; while this block is active those
++    caches are bypassed too, so a jit call compiles instead of returning a
++    kernel built earlier in the process. A cache state the caller had already
++    disabled is restored on exit.
+     """
+     enabled = CacheState.is_enabled()
+     CacheState.disable()

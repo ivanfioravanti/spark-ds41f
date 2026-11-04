@@ -1,0 +1,20 @@
+[
+  {
+    "number": 3715,
+    "merged_commit": "0176ba1465b12758f41802bf838ddd68d43c9ee9",
+    "parent": "de44ac0ae117390ab9c158c80714542cf23b0d78",
+    "variant": "without-3715",
+    "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/without-3715.diff",
+    "tree": "c38667950c19ad900cf557ccbd901beb4adb2d72",
+    "intent": "One reverted optimization against the unreleased compiler candidate; no released build is measured."
+  },
+  {
+    "number": 3761,
+    "merged_commit": "2123e412ce2217b324c50c4ec967213906456ac5",
+    "parent": "fa69f7fa817cacab1af36e9e616c6aaba6ee115b",
+    "variant": "without-3761",
+    "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/without-3761.diff",
+    "tree": "da2a6c084dd9b1ce413ed9323357fe225bf7d67f",
+    "intent": "One reverted optimization against the unreleased compiler candidate; no released build is measured."
+  }
+]

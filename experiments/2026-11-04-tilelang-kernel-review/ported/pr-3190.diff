@@ -1,0 +1,1469 @@
+Upstream-base: tile-ai/tilelang@2123e412 with the five-patch compiler candidate.
+Upstream-source: https://github.com/tile-ai/tilelang/pull/3190 at 6ddd3e04963e7fec2cb46aff19674a3d952799b2
+Rationale: standalone evaluation of [JIT] Add explicit compile-before-execute mode.
+Quality: retain existing compiler features; numerical and compatibility checks are required before adoption.
+Tests: see case receipts; hardware validation is pending until native receipts exist. No vLLM service is started.
+Upstream-status: open PR as checked 2026-11-04; experimental port only.
+
+diff --git a/README.md b/README.md
+index 9e93a7d9..0408c13e 100644
+--- a/README.md
++++ b/README.md
+@@ -203,6 +203,14 @@ print("GEMM + ReLU passed.")
+ 
+ `@tilelang.jit` specializes the kernel for the input shape and compile-time arguments on first use. `T.Pipelined` stages global-to-shared transfers, `T.gemm` maps the tile operation to the target backend, and `T.Parallel` expresses the elementwise ReLU epilogue. Continue with the [language basics](https://tilelang.com/programming_guides/language_basics.html), then explore the [GEMM examples](https://github.com/tile-ai/tilelang/tree/main/examples/gemm) for layouts, autotuning, and architecture-specific optimizations.
+ 
++To separate compilation from execution, set
++`TILELANG_REQUIRE_EXPLICIT_COMPILE=1` and call
++`matmul_relu.compile(a, b)` before `matmul_relu(a, b)`. A new specialization
++then raises an error instead of compiling during execution. The first kernel
++launch also seals compilation for the process, so compile every kernel first;
++see the
++[explicit compilation guide](https://tilelang.com/programming_guides/language_basics.html#separating-compilation-from-execution).
++
+ ## Examples
+ 
+ - **Start here:** [quickstart](https://github.com/tile-ai/tilelang/blob/main/examples/quickstart.py) and [elementwise kernels](https://github.com/tile-ai/tilelang/tree/main/examples/elementwise)
+diff --git a/docs/programming_guides/autotuning.md b/docs/programming_guides/autotuning.md
+index df0c6c09..cd4a2998 100644
+--- a/docs/programming_guides/autotuning.md
++++ b/docs/programming_guides/autotuning.md
+@@ -264,6 +264,13 @@ Control via env vars (tilelang.env)
+ - `TILELANG_CACHE_DIR` (default `~/.tilelang/cache`)
+ - Disable all kernel caches: `TILELANG_DISABLE_CACHE=1`
+ - Disable autotune disk cache only: `TILELANG_AUTO_TUNING_DISABLE_CACHE=1`
++- Require an explicit `.compile()` before decorated invocation:
++  `TILELANG_REQUIRE_EXPLICIT_COMPILE=1`. Autotuning necessarily executes
++  candidates, but this mode finishes compiling every candidate before
++  benchmarking begins. The first benchmark seals compilation for the process,
++  so compile other kernels before starting autotuning. A fresh CuTeDSL artifact
++  cannot provide this guarantee because its final specialization needs runtime
++  tensor metadata; strict mode rejects it instead of compiling during execution.
+ 
+ CPU worker control
+ - `TILELANG_AUTO_TUNING_CPU_UTILITIES` (fraction, default 0.9)
+@@ -298,6 +305,12 @@ kernels = impl.par_compile(cfgs, num_workers=4)
+ # Now benchmark kernels[i](A, B, C) yourself
+ ```
+ 
++`par_compile` also registers every successful specialization for later calls
++through `impl`. This permits a strict compile phase followed by an execution
++phase when `TILELANG_REQUIRE_EXPLICIT_COMPILE=1`. The first launch seals the
++compilation phase; `tilelang.seal_compilation()` can establish the boundary
++explicitly.
++
+ ## Recording and Reusing Best Configs
+ 
+ The programmatic path returns an `AutotuneResult` that can be saved and later
+diff --git a/docs/programming_guides/language_basics.md b/docs/programming_guides/language_basics.md
+index 1f664f3d..0e6fa2e8 100644
+--- a/docs/programming_guides/language_basics.md
++++ b/docs/programming_guides/language_basics.md
+@@ -235,6 +235,70 @@ Notes
+   while cached kernels are in use. Runtime tensor arguments are excluded from this
+   requirement.
+ 
++### Separating compilation from execution
++
++Set `TILELANG_REQUIRE_EXPLICIT_COMPILE=1` when execution must never trigger a
++new compilation. Every specialization must then be registered with `.compile()`
++or `.par_compile()` before any TileLang kernel is launched:
++
++```bash
++export TILELANG_REQUIRE_EXPLICIT_COMPILE=1
++```
++
++```python
++# Compilation phase: no kernel launch.
++add.compile(1 << 20)
++add.compile(1 << 22)
++
++# Optional explicit boundary; the first kernel launch also seals automatically.
++tilelang.seal_compilation()
++
++# Execution phase: these calls only look up an explicitly compiled specialization.
++add(1 << 20)(A_small, B_small, C_small)
++add(1 << 22)(A_large, B_large, C_large)
++```
++
++For an eager-style JIT function, pass the same tensors and compile-time
++arguments that will specialize the later call:
++
++```python
++matmul_relu.compile(a, b, block_M=128)
++c = matmul_relu(a, b, block_M=128)
++```
++
++Eager kernels whose shapes are declared with `T.const` can also be compiled
++without allocating the tensors first. For example,
++`copy.compile(M=1024, N=1024)` registers the specialization used later by
++matching 1024-by-1024 tensors.
++
++An invocation with a shape, dtype, stride, or compile-time argument that was
++not explicitly compiled raises `RuntimeError` instead of compiling lazily.
++Set the variable before the compilation phase: in addition to enforcing the
++lookup, it makes `.compile()` finish backend preparation that would otherwise
++be deferred to the first launch. `TILELANG_DISABLE_CACHE=1` may be used at the
++same time; it disables TileLang's global/persistent cache but does not disable
++the current process's explicit-specialization registry.
++
++The first kernel launch atomically seals compilation for the entire Python
++process. It waits for compilation calls already in progress, then every later
++`.compile()` or `.par_compile()` raises `RuntimeError`; additional launches of
++compiled kernels remain valid. A harness can call `tilelang.seal_compilation()`
++to establish this boundary before allocating execution resources. The phase is
++intentionally irreversible and process-local: start a new worker process for a
++new compilation phase, and use harness-level coordination across processes.
++
++For autotuned decorators, `.compile()` still executes candidate kernels to
++benchmark them. In explicit-compile mode, TileLang disables pipelined
++compile/benchmark overlap so all candidate compilation finishes before any
++candidate execution begins. The first candidate benchmark seals the process,
++so compile other kernels before starting an autotuning call.
++
++The CuTeDSL execution backend is the exception for a fresh artifact: its final
++`cute.compile` specialization requires runtime tensor metadata. Strict mode
++therefore rejects `.compile()` instead of silently compiling on first
++execution. Use `tvm_ffi`, `cython`, or `nvrtc` for strict two-phase execution,
++or reuse a CuTeDSL cache entry whose cubin has already been generated.
++
+ ## 7. Tiled GEMM Skeleton
+ 
+ Below is a minimal pattern for a tiled GEMM using shared memory staging and a
+diff --git a/testing/python/autotune/test_tilelang_autotune_explicit_compile.py b/testing/python/autotune/test_tilelang_autotune_explicit_compile.py
+new file mode 100644
+index 00000000..073554f5
+--- /dev/null
++++ b/testing/python/autotune/test_tilelang_autotune_explicit_compile.py
+@@ -0,0 +1,123 @@
++from types import SimpleNamespace
++
++import pytest
++import torch
++
++import tilelang
++import tilelang.language as T
++from tilelang.autotuner.tuner import AutoTuneImpl
++from tilelang.jit.compile_phase import _reset_compilation_phase_for_testing
++
++
++def _lazy_kernel_factory(size: int, block: int = 64):
++    @T.prim_func
++    def kernel():
++        T.evaluate(size + block)
++
++    return kernel
++
++
++def _eager_copy(A, B, block: int = 8):
++    M, N = T.const("M N")
++    A: T.Tensor[[M, N], T.float32]
++    B: T.Tensor[[M, N], T.float32]
++
++    with T.Kernel(T.ceildiv(M, block), T.ceildiv(N, block), threads=128):
++        T.evaluate(0)
++
++
++class _FakeKernel:
++    def __init__(self):
++        self.prepare_count = 0
++        self.calls = []
++
++    def __call__(self, *args, **kwargs):
++        self.calls.append((args, kwargs))
++        return "executed"
++
++    def prepare_for_execution(self):
++        self.prepare_count += 1
++        return self
++
++
++class _FakeTuner:
++    def __init__(self, kernel):
++        self.kernel = kernel
++        self.run_count = 0
++        self.kernel_parameters = None
++
++    def set_kernel_parameters(self, *args):
++        self.kernel_parameters = args
++
++    def run(self):
++        self.run_count += 1
++        self.kernel.prepare_for_execution()
++        # AutoTuner.run benchmarks after candidate preparation.
++        tilelang.seal_compilation()
++        return SimpleNamespace(kernel=self.kernel, config={"block": 32})
++
++
++@pytest.fixture(autouse=True)
++def explicit_compile_environment(monkeypatch):
++    _reset_compilation_phase_for_testing()
++    monkeypatch.setenv("TILELANG_DISABLE_CACHE", "1")
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    yield
++    _reset_compilation_phase_for_testing()
++
++
++def test_autotune_requires_explicit_compile_before_lookup(monkeypatch):
++    impl = AutoTuneImpl(jit_impl=tilelang.jit(_lazy_kernel_factory), configs=[{"block": 32}])
++    kernel = _FakeKernel()
++    tuner = _FakeTuner(kernel)
++    monkeypatch.setattr(impl, "get_tunner", lambda: tuner)
++
++    with pytest.raises(RuntimeError, match="No explicitly compiled specialization"):
++        impl(8)
++    assert tuner.run_count == 0
++
++    assert impl.compile(8) is kernel
++    assert kernel.prepare_count == 1
++    assert tuner.run_count == 1
++    assert impl(8) is kernel
++    assert tuner.run_count == 1
++
++    with pytest.raises(RuntimeError, match="No explicitly compiled specialization"):
++        impl(16)
++    assert tuner.run_count == 1
++    with pytest.raises(RuntimeError, match="compilation is sealed"):
++        impl.compile(16)
++
++
++def test_autotune_candidate_compilation_is_explicit_in_strict_mode(monkeypatch):
++    jit_impl = tilelang.jit(_lazy_kernel_factory)
++    impl = AutoTuneImpl(jit_impl=jit_impl, configs=[{"block": 32}])
++    sentinel = object()
++    calls = []
++
++    def explicit_compile(*args, **kwargs):
++        calls.append((args, kwargs))
++        return sentinel
++
++    monkeypatch.setattr(jit_impl, "compile", explicit_compile)
++    compile_candidate = impl._make_jit_compile_func("lazy", (8,), {})
++
++    assert compile_candidate(block=32) is sentinel
++    assert calls == [((8,), {"block": 32})]
++
++
++def test_eager_autotune_compile_authorizes_matching_tensor_execution(monkeypatch):
++    impl = AutoTuneImpl(jit_impl=tilelang.jit(_eager_copy), configs=[{"block": 8}])
++    kernel = _FakeKernel()
++    tuner = _FakeTuner(kernel)
++    monkeypatch.setattr(impl, "get_tunner", lambda: tuner)
++    a = torch.empty(8, 8)
++    b = torch.empty(8, 8)
++
++    assert impl.compile(a, b) is kernel
++    assert impl(torch.empty_like(a), torch.empty_like(b)) == "executed"
++    assert len(kernel.calls) == 1
++    assert tuner.run_count == 1
++
++    with pytest.raises(RuntimeError, match="No explicitly compiled specialization"):
++        impl(torch.empty(16, 8), torch.empty(16, 8))
+diff --git a/testing/python/components/test_tilelang_env.py b/testing/python/components/test_tilelang_env.py
+index e9104c14..e5eb9681 100644
+--- a/testing/python/components/test_tilelang_env.py
++++ b/testing/python/components/test_tilelang_env.py
+@@ -68,3 +68,21 @@ def test_pass_profile_threshold_explicit_zero_overrides_environment():
+     key = tilelang.PassConfigKey.TL_PASS_PROFILE_THRESHOLD_MS
+ 
+     assert resolve_pass_profile_threshold_ms({key: 0}, key, lambda: 10.0) == 0.0
++
++
++@pytest.mark.parametrize(
++    ("value", "expected"),
++    [(None, False), ("0", False), ("false", False), ("1", True), ("true", True), (" YES ", True), ("on", True)],
++)
++def test_explicit_compile_required_values(monkeypatch, value, expected):
++    desc = _env_var_descriptor("TILELANG_REQUIRE_EXPLICIT_COMPILE")
++    original_forced_value = desc._forced_value
++    desc._forced_value = None
++    try:
++        if value is None:
++            monkeypatch.delenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", raising=False)
++        else:
++            monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", value)
++        assert tilelang.env.is_explicit_compile_required() is expected
++    finally:
++        _restore_forced_value("TILELANG_REQUIRE_EXPLICIT_COMPILE", original_forced_value)
+diff --git a/testing/python/jit/test_tilelang_jit_compile_phase.py b/testing/python/jit/test_tilelang_jit_compile_phase.py
+new file mode 100644
+index 00000000..4df9ad3d
+--- /dev/null
++++ b/testing/python/jit/test_tilelang_jit_compile_phase.py
+@@ -0,0 +1,163 @@
++import importlib
++import threading
++
++import pytest
++
++import tilelang
++import tilelang.language as T
++from tilelang.jit.adapter.base import BaseKernelAdapter
++from tilelang.jit.compile_phase import (
++    _reset_compilation_phase_for_testing,
++    compilation_scope,
++    is_compilation_sealed,
++)
++from tilelang.jit.kernel import JITKernel
++
++
++jit_module = importlib.import_module("tilelang.jit")
++
++
++@T.prim_func
++def _empty_prim_func():
++    T.evaluate(0)
++
++
++class _RecordingAdapter(BaseKernelAdapter):
++    def __init__(self):
++        self.calls = []
++        super().__init__(mod=None, params=[], result_idx=[])
++
++    def _convert_torch_func(self):
++        def launch(*args, **kwargs):
++            self.calls.append((args, kwargs))
++            return "launched"
++
++        return launch
++
++
++@pytest.fixture(autouse=True)
++def isolated_compilation_phase(monkeypatch):
++    _reset_compilation_phase_for_testing()
++    monkeypatch.delenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", raising=False)
++    yield
++    _reset_compilation_phase_for_testing()
++
++
++def test_default_mode_does_not_seal_compilation():
++    adapter = _RecordingAdapter()
++
++    tilelang.seal_compilation()
++    assert adapter.func(1, named=2) == "launched"
++    with compilation_scope():
++        pass
++
++    assert not is_compilation_sealed()
++    assert adapter.calls == [((1,), {"named": 2})]
++
++
++def test_first_kernel_launch_seals_compilation(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    adapter = _RecordingAdapter()
++
++    with compilation_scope():
++        pass
++    assert adapter.func() == "launched"
++    assert is_compilation_sealed()
++
++    with pytest.raises(RuntimeError, match="compilation is sealed"), compilation_scope():
++        pass
++
++    # Once sealed, additional kernel launches remain valid.
++    assert adapter() == "launched"
++
++
++def test_explicit_seal_establishes_execution_boundary(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    adapter = _RecordingAdapter()
++
++    tilelang.seal_compilation()
++
++    assert is_compilation_sealed()
++    assert adapter() == "launched"
++    with pytest.raises(RuntimeError, match="start a new Python process"), compilation_scope():
++        pass
++    with pytest.raises(RuntimeError, match="compilation is sealed"):
++        jit_module.par_compile([])
++
++
++def test_compile_launch_compile_sequence_is_rejected(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    adapter = _RecordingAdapter()
++    kernel = JITKernel.__new__(JITKernel)
++    kernel.adapter = adapter
++    kernel.torch_function = adapter.func
++    cache_calls = []
++
++    def fake_cached(**kwargs):
++        cache_calls.append(kwargs)
++        return kernel
++
++    monkeypatch.setattr(jit_module, "cached", fake_cached)
++
++    assert jit_module.compile(_empty_prim_func) is kernel
++    assert kernel() == "launched"
++    with pytest.raises(RuntimeError, match="compilation is sealed"):
++        jit_module.compile(_empty_prim_func)
++
++    assert len(cache_calls) == 1
++
++
++def test_launch_waits_for_active_compilation(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    adapter = _RecordingAdapter()
++    compile_started = threading.Event()
++    release_compile = threading.Event()
++    launch_started = threading.Event()
++    launch_finished = threading.Event()
++    errors = []
++
++    def compile_worker():
++        try:
++            with compilation_scope():
++                compile_started.set()
++                if not release_compile.wait(timeout=2):
++                    raise TimeoutError("test did not release compilation")
++        except Exception as error:
++            errors.append(error)
++
++    def launch_worker():
++        launch_started.set()
++        try:
++            adapter()
++        except Exception as error:
++            errors.append(error)
++        finally:
++            launch_finished.set()
++
++    compile_thread = threading.Thread(target=compile_worker)
++    launch_thread = threading.Thread(target=launch_worker)
++    compile_thread.start()
++    assert compile_started.wait(timeout=2)
++    launch_thread.start()
++    assert launch_started.wait(timeout=2)
++    assert not launch_finished.wait(timeout=0.05)
++
++    release_compile.set()
++    compile_thread.join(timeout=2)
++    launch_thread.join(timeout=2)
++
++    assert not compile_thread.is_alive()
++    assert not launch_thread.is_alive()
++    assert errors == []
++    assert is_compilation_sealed()
++
++
++def test_same_thread_launch_during_compilation_fails_without_deadlock(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    adapter = _RecordingAdapter()
++
++    with compilation_scope(), pytest.raises(RuntimeError, match="thread that is still compiling"):
++        adapter()
++
++    assert not is_compilation_sealed()
++    assert adapter() == "launched"
+diff --git a/testing/python/jit/test_tilelang_jit_explicit_compile.py b/testing/python/jit/test_tilelang_jit_explicit_compile.py
+new file mode 100644
+index 00000000..afee119c
+--- /dev/null
++++ b/testing/python/jit/test_tilelang_jit_explicit_compile.py
+@@ -0,0 +1,226 @@
++import importlib
++from types import SimpleNamespace
++
++import pytest
++import torch
++
++import tilelang
++import tilelang.language as T
++import tilelang.testing
++from tilelang.jit.adapter.cutedsl.adapter import CuTeDSLKernelAdapter
++from tilelang.jit.compile_phase import _reset_compilation_phase_for_testing
++
++
++jit_module = importlib.import_module("tilelang.jit")
++
++
++def _lazy_kernel_factory(size: int):
++    @T.prim_func
++    def kernel():
++        T.evaluate(size)
++
++    return kernel
++
++
++def _eager_copy(A, B, block: int = 8):
++    M, N = T.const("M N")
++    A: T.Tensor[[M, N], T.float32]
++    B: T.Tensor[[M, N], T.float32]
++
++    with T.Kernel(T.ceildiv(M, block), T.ceildiv(N, block), threads=128) as (pid_m, pid_n):
++        for i, j in T.Parallel(block, block):
++            row = pid_m * block + i
++            col = pid_n * block + j
++            if row < M and col < N:
++                B[row, col] = A[row, col]
++
++
++@T.prim_func
++def _empty_prim_func():
++    T.evaluate(0)
++
++
++class _FakeKernel:
++    def __init__(self, result=None):
++        self.result = result
++        self.calls = []
++        self.prepare_count = 0
++
++    def __call__(self, *args, **kwargs):
++        self.calls.append((args, kwargs))
++        return self.result
++
++    def prepare_for_execution(self):
++        self.prepare_count += 1
++        return self
++
++
++@pytest.fixture
++def fake_compile(monkeypatch):
++    kernels = []
++
++    def compile_prim_func(_func, **_kwargs):
++        kernel = _FakeKernel(result=len(kernels))
++        kernels.append(kernel)
++        return kernel
++
++    monkeypatch.setattr(jit_module, "compile", compile_prim_func)
++    return kernels
++
++
++@pytest.fixture(autouse=True)
++def explicit_compile_environment(monkeypatch):
++    # The explicit-specialization registry is intentionally independent of the
++    # persistent/global kernel cache.
++    _reset_compilation_phase_for_testing()
++    monkeypatch.setenv("TILELANG_DISABLE_CACHE", "1")
++    monkeypatch.delenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", raising=False)
++    yield
++    _reset_compilation_phase_for_testing()
++
++
++def test_default_mode_still_compiles_on_first_invocation(fake_compile):
++    factory = tilelang.jit(_lazy_kernel_factory)
++
++    assert factory(8) is fake_compile[0]
++    assert factory(8) is fake_compile[0]
++    assert len(fake_compile) == 1
++
++
++def test_strict_mode_rejects_lazy_compile_on_invocation(monkeypatch, fake_compile):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    factory = tilelang.jit(_lazy_kernel_factory)
++
++    with pytest.raises(RuntimeError, match=r"factory\.compile\(\.\.\.\)"):
++        factory(8)
++
++    assert fake_compile == []
++
++
++def test_explicit_compile_registers_specialization_with_cache_disabled(monkeypatch, fake_compile):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    factory = tilelang.jit(_lazy_kernel_factory)
++
++    compiled = factory.compile(8)
++
++    assert compiled is fake_compile[0]
++    assert factory(8) is compiled
++    assert len(fake_compile) == 1
++    with pytest.raises(RuntimeError, match="matching tensor shapes"):
++        factory(16)
++
++
++def test_implicit_compile_does_not_authorize_later_strict_invocation(monkeypatch, fake_compile):
++    factory = tilelang.jit(_lazy_kernel_factory)
++    implicit_kernel = factory(8)
++
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    with pytest.raises(RuntimeError, match="No explicitly compiled specialization"):
++        factory(8)
++
++    explicit_kernel = factory.compile(8)
++    assert explicit_kernel is not implicit_kernel
++    assert factory(8) is explicit_kernel
++    assert len(fake_compile) == 2
++
++
++def test_eager_explicit_compile_then_invocation(monkeypatch, fake_compile):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    copy = tilelang.jit(_eager_copy)
++    a = torch.empty(8, 8)
++    b = torch.empty(8, 8)
++
++    compiled = copy.compile(a, b)
++
++    assert copy(a, b) == 0
++    assert compiled.calls == [((a, b), {})]
++    with pytest.raises(RuntimeError, match="No explicitly compiled specialization"):
++        copy(torch.empty(16, 8), torch.empty(16, 8))
++    assert len(fake_compile) == 1
++
++
++def test_shape_only_eager_compile_authorizes_equivalent_tensor_call(monkeypatch, fake_compile):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    copy = tilelang.jit(_eager_copy)
++    compiled = copy.compile(M=8, N=8)
++    a = torch.empty(8, 8)
++    b = torch.empty(8, 8)
++
++    assert copy(a, b) == 0
++    assert compiled.calls == [((a, b), {})]
++    assert len(fake_compile) == 1
++
++
++def test_parallel_compile_registers_every_specialization(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    factory = tilelang.jit(_lazy_kernel_factory)
++    kernels = [_FakeKernel("eight"), _FakeKernel("sixteen")]
++
++    def fake_par_compile(funcs, **_kwargs):
++        assert len(list(funcs)) == 2
++        return kernels
++
++    monkeypatch.setattr(jit_module, "par_compile", fake_par_compile)
++
++    assert factory.par_compile([(8,), (16,)]) == kernels
++    assert factory(8) is kernels[0]
++    assert factory(16) is kernels[1]
++    with pytest.raises(RuntimeError, match="No explicitly compiled specialization"):
++        factory(32)
++
++
++@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on", " On "])
++def test_explicit_compile_environment_truthy_values(monkeypatch, value):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", value)
++    assert tilelang.env.is_explicit_compile_required()
++
++
++def test_top_level_compile_prepares_backend_in_strict_mode(monkeypatch):
++    kernel = _FakeKernel()
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    monkeypatch.setattr(jit_module, "cached", lambda **_kwargs: kernel)
++
++    assert jit_module.compile(_empty_prim_func) is kernel
++    assert kernel.prepare_count == 1
++
++
++def test_top_level_compile_preserves_lazy_backend_preparation_by_default(monkeypatch):
++    kernel = _FakeKernel()
++    monkeypatch.setattr(jit_module, "cached", lambda **_kwargs: kernel)
++
++    assert jit_module.compile(_empty_prim_func) is kernel
++    assert kernel.prepare_count == 0
++
++
++def test_cutedsl_fresh_cubin_rejects_compile_before_execution_claim():
++    adapter = CuTeDSLKernelAdapter.__new__(CuTeDSLKernelAdapter)
++    adapter.pymodule = SimpleNamespace(_cubin_needs_generation=True)
++
++    with pytest.raises(RuntimeError, match="cannot prepare a fresh CuTeDSL cubin"):
++        adapter.prepare_for_execution()
++
++
++def test_cutedsl_precompiled_cubin_is_ready_for_execution():
++    adapter = CuTeDSLKernelAdapter.__new__(CuTeDSLKernelAdapter)
++    adapter.pymodule = SimpleNamespace(_cubin_needs_generation=False)
++
++    adapter.prepare_for_execution()
++
++
++@tilelang.testing.requires_cuda
++def test_real_eager_compile_then_execute(monkeypatch):
++    monkeypatch.setenv("TILELANG_REQUIRE_EXPLICIT_COMPILE", "1")
++    copy = tilelang.jit(_eager_copy)
++    compiled = copy.compile(M=8, N=8)
++
++    # TVM-FFI normally links its Executable lazily during __call__. Strict mode
++    # must have completed that step while compiling.
++    assert compiled.adapter.executable is not None
++
++    a = torch.randn(8, 8, device="cuda")
++    b = torch.empty_like(a)
++    copy(a, b)
++    torch.testing.assert_close(b, a)
++
++    with pytest.raises(RuntimeError, match="compilation is sealed"):
++        copy.compile(M=16, N=8)
+diff --git a/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py b/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py
+index c1900e9d..051a86b9 100644
+--- a/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py
++++ b/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py
+@@ -8,7 +8,7 @@ from tilelang import tvm
+ from tilelang.jit.kernel import JITKernel
+ from tilelang.jit.abi import prepare_tvm_ffi_callee_allocated_outputs
+ from tilelang.jit.adapter import tvm_ffi as tvm_ffi_adapter
+-from tilelang.jit.adapter.tvm_ffi import TVMFFIKernelAdapter
++from tilelang.jit.adapter.tvm_ffi import COMPILE_ARGS, TVMFFIKernelAdapter
+ 
+ tirx = tvm.tirx
+ 
+@@ -116,6 +116,40 @@ def test_preloaded_executable_is_reused():
+     assert created == []
+ 
+ 
++def test_prepare_for_execution_jits_fresh_executable_before_dispatch():
++    adapter, _ = _make_adapter()
++    adapter.rt_mod = object()
++    jit_calls = []
++
++    class FakeExecutable:
++        def jit(self, **kwargs):
++            jit_calls.append(kwargs)
++            return self
++
++    executable = FakeExecutable()
++    adapter._make_executable = lambda: executable
++
++    adapter.prepare_for_execution()
++
++    assert adapter.executable is executable
++    assert jit_calls == [COMPILE_ARGS]
++
++
++def test_prepare_for_execution_skips_preloaded_disk_cache_module():
++    adapter, created = _make_adapter()
++    adapter.rt_mod = None
++
++    def preloaded_executable(*args):
++        return None
++
++    adapter.executable = preloaded_executable
++
++    adapter.prepare_for_execution()
++
++    assert adapter.executable is preloaded_executable
++    assert created == []
++
++
+ def test_disk_cached_library_can_be_exported(tmp_path):
+     cached_library = tmp_path / "cache" / "kernel_lib.so"
+     cached_library.parent.mkdir()
+diff --git a/tilelang/__init__.py b/tilelang/__init__.py
+index b9de6a43..4b832010 100644
+--- a/tilelang/__init__.py
++++ b/tilelang/__init__.py
+@@ -197,7 +197,7 @@ if not env.is_light_import():
+         if env.SKIP_LOADING_TILELANG_SO == "0":
+             _LIB, _LIB_PATH = _load_tile_lang_lib()
+ 
+-    from .jit import jit, JITKernel, compile, par_compile, prepare  # noqa: F401
++    from .jit import jit, JITKernel, compile, par_compile, prepare, seal_compilation  # noqa: F401
+     from .profiler import Profiler  # noqa: F401
+     from .utils import (
+         TensorSupplyType,  # noqa: F401
+diff --git a/tilelang/autotuner/grouped_compile.py b/tilelang/autotuner/grouped_compile.py
+index 20d5a16b..4130951e 100644
+--- a/tilelang/autotuner/grouped_compile.py
++++ b/tilelang/autotuner/grouped_compile.py
+@@ -18,6 +18,7 @@ from tilelang.engine.lower import lower_to_host_device_ir, device_codegen, host_
+ from tilelang.engine.param import CompiledArtifact
+ from tilelang.jit.adapter import TVMFFIKernelAdapter
+ from tilelang.jit.abi import prepare_tvm_ffi_callee_allocated_outputs
++from tilelang.jit.compile_phase import compilation_guard
+ from tilelang.jit.kernel import JITKernel
+ from tilelang.transform import PassConfigKey
+ from tilelang.transform.pass_config import normalize_pass_configs
+@@ -42,6 +43,7 @@ def _with_device_compile_flags(
+     return pass_configs
+ 
+ 
++@compilation_guard
+ def compile_grouped_unit_tvm_ffi(
+     unit_items: list[tuple[int, dict[str, Any]]],
+     compile_args: CompileArgs,
+diff --git a/tilelang/autotuner/tuner.py b/tilelang/autotuner/tuner.py
+index 80c3cea4..22213668 100644
+--- a/tilelang/autotuner/tuner.py
++++ b/tilelang/autotuner/tuner.py
+@@ -11,6 +11,7 @@ import tilelang
+ from tilelang import tvm as tvm
+ from tilelang import env
+ from tilelang.jit import JITImpl
++from tilelang.jit.compile_phase import compilation_scope
+ from tilelang.jit.kernel import JITKernel
+ from tvm.tirx import PrimFunc, Var
+ from tvm.target import Target
+@@ -868,6 +869,13 @@ class AutoTuner:
+             raise ValueError("Trial reporting with early_stop is not supported in this prototype")
+         reporter = TrialReporter(on_trial, logger)
+ 
++        if env.is_explicit_compile_required() and use_pipeline:
++            logger.info(
++                "Disabling pipelined autotune benchmarking because "
++                "TILELANG_REQUIRE_EXPLICIT_COMPILE=1 requires compilation to finish before execution."
++            )
++            use_pipeline = False
++
+         sig = inspect.signature(self.fn)
+         parameters = sig.parameters
+ 
+@@ -918,6 +926,8 @@ class AutoTuner:
+ 
+         if cached_result is not None:
+             # Never invoke user code while holding the shared cache lock.
++            if env.is_explicit_compile_required():
++                cached_result.kernel.prepare_for_execution()
+             reporter.emit("cache_hit")
+             return cached_result
+ 
+@@ -1139,6 +1149,12 @@ class AutoTuner:
+                             logger.debug(f"Compilation failed for config {self.configs[idx]} at index {idx} with error: {error}")
+                             continue
+                         assert jit_kernel is not None
++                        if env.is_explicit_compile_required():
++                            try:
++                                jit_kernel.prepare_for_execution()
++                            except Exception as e:
++                                logger.debug(f"Backend preparation failed for config {self.configs[idx]} at index {idx} with error: {e}")
++                                continue
+                         _enqueue_benchmark_task(jit_kernel=jit_kernel, config=config, idx=idx)
+ 
+                 _drain_benchmark_results(progress_bar=progress_bar, block=False)
+@@ -1233,6 +1249,7 @@ class AutoTuneImpl(Generic[_P, _T]):
+ 
+     def __post_init__(self):
+         self._tuner_cache = {}
++        self._explicitly_compiled_keys = set()
+ 
+     def _make_jit_compile_func(self, mode: str, args: tuple, kwargs: dict) -> Callable[..., JITKernel]:
+         """Compile configurations with their own JIT pass configurations."""
+@@ -1249,7 +1266,7 @@ class AutoTuneImpl(Generic[_P, _T]):
+                 key_lock = key_locks.setdefault(key, threading.Lock())
+             # Keep equivalent configurations on the same cold compilation.
+             with key_lock:
+-                if per_config_pass_configs is None and mode == "lazy":
++                if per_config_pass_configs is None and mode == "lazy" and not env.is_explicit_compile_required():
+                     return jit_impl(*args, **kwargs, __tune_params=config_arg)
+                 if per_config_pass_configs is not None:
+                     merged_pc = dict(jit_impl.pass_configs or {})
+@@ -1298,6 +1315,12 @@ class AutoTuneImpl(Generic[_P, _T]):
+ 
+     def __call__(self, *args: _P.args, **kwargs: _P.kwargs) -> JITKernel | _T:
+         return_kernel = kwargs.pop("__return_kernel", False)
++        if return_kernel:
++            # AutoTuneImpl.compile() includes benchmark launches, so it cannot
++            # hold a compilation lease for the whole call. Still reject a new
++            # tuning request once another kernel has entered execution phase.
++            with compilation_scope():
++                pass
+ 
+         mode = self.jit_impl.initialize_jit_mode(*args, **kwargs)
+         autotuner = self.get_tunner()
+@@ -1315,6 +1338,10 @@ class AutoTuneImpl(Generic[_P, _T]):
+             norm_args = _normalize_value(args, sort_dict_items=True)
+             norm_kwargs = _normalize_value(kwargs, sort_dict_items=True)
+         key = (norm_args, norm_kwargs)
++        require_explicit_compile = env.is_explicit_compile_required()
++        if require_explicit_compile and not return_kernel and key not in self._explicitly_compiled_keys:
++            raise self.jit_impl._explicit_compile_error()
++
+         if key not in self._tuner_cache:
+ 
+             def jit_elaborate(**config_arg):
+@@ -1332,6 +1359,9 @@ class AutoTuneImpl(Generic[_P, _T]):
+ 
+         best_kernel, best_config = self._tuner_cache[key]
+ 
++        if return_kernel:
++            self._explicitly_compiled_keys.add(key)
++
+         if mode == "lazy":
+             return best_kernel
+         else:
+diff --git a/tilelang/cache/__init__.py b/tilelang/cache/__init__.py
+index 9e79bfec..58132cee 100644
+--- a/tilelang/cache/__init__.py
++++ b/tilelang/cache/__init__.py
+@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Literal
+ from tvm.target import Target as TVMTarget
+ from tvm.tirx import PrimFunc
+ from tilelang.jit import JITKernel
++from tilelang.jit.compile_phase import compilation_guard
+ from tilelang import env
+ from tilelang.cache.kernel_cache import KernelNotPreparedError, freeze, frozen, thaw  # noqa: F401
+ from tilelang.jit.adapter.cutedsl.kernel_cache import CuTeDSLKernelCache
+@@ -74,6 +75,7 @@ def _resolve_cache_dispatch(
+     return dispatch_map[resolved_backend], context, verbose
+ 
+ 
++@compilation_guard
+ def cached(
+     func: PrimFunc = None,
+     out_idx: list[int] = None,
+diff --git a/tilelang/env.py b/tilelang/env.py
+index 68922eda..31c98261 100644
+--- a/tilelang/env.py
++++ b/tilelang/env.py
+@@ -407,6 +407,9 @@ class Environment:
+     )  # cleanup temporary compiler files/dirs after compilation (set to 0 to keep for debugging)
+     TILELANG_HIP_SAVE_TEMP_FILES = EnvVar("TILELANG_HIP_SAVE_TEMP_FILES", "0")  # save temporary files for HIP compilation
+     TILELANG_JIT_DIAGNOSTICS = EnvVar("TILELANG_JIT_DIAGNOSTICS", "0")  # enable JIT phase diagnostics
++    TILELANG_REQUIRE_EXPLICIT_COMPILE = EnvVar(
++        "TILELANG_REQUIRE_EXPLICIT_COMPILE", "0"
++    )  # require .compile() and seal compilation on the first kernel launch
+     TILELANG_COMPILE_TIMEOUT_SECONDS = EnvVar("TILELANG_COMPILE_TIMEOUT_SECONDS", "")  # optional NVCC subprocess timeout in seconds
+ 
+     # Pass diff debugging
+@@ -496,6 +499,9 @@ class Environment:
+     def is_jit_diagnostics_enabled(self) -> bool:
+         return str(self.TILELANG_JIT_DIAGNOSTICS).lower() in ("1", "true", "yes", "on")
+ 
++    def is_explicit_compile_required(self) -> bool:
++        return str(self.TILELANG_REQUIRE_EXPLICIT_COMPILE).strip().lower() in ("1", "true", "yes", "on")
++
+     def is_pass_profile_enabled(self) -> bool:
+         return str(self.TILELANG_PASS_PROFILE).strip().lower() in ("1", "true", "yes", "on")
+ 
+diff --git a/tilelang/jit/__init__.py b/tilelang/jit/__init__.py
+index 3de1b525..74d641de 100644
+--- a/tilelang/jit/__init__.py
++++ b/tilelang/jit/__init__.py
+@@ -27,7 +27,9 @@ from tvm.target import Target
+ from contextlib import nullcontext
+ 
+ from tilelang.jit.kernel import JITKernel
++from tilelang.jit.compile_phase import compilation_guard, seal_compilation as seal_compilation
+ from tilelang.cache import KernelNotPreparedError, cached
++from tilelang.env import env
+ from tilelang.utils.device import get_available_cpu_count
+ from os import path, makedirs
+ from logging import getLogger
+@@ -95,6 +97,7 @@ class _CallFormCache:
+         self._remember(call_form_key, kernel)
+ 
+ 
++@compilation_guard
+ def compile(
+     func: PrimFunc[_KP, _T] = None,
+     out_idx: list[int] | int | None = None,
+@@ -139,6 +142,10 @@ def compile(
+         Default execution backend. Defaults to "auto".
+     TILELANG_VERBOSE : str
+         Set to "1", "true", "yes", or "on" to enable verbose compilation by default.
++    TILELANG_REQUIRE_EXPLICIT_COMPILE : str
++        When enabled, finish backend preparation during this explicit compile
++        instead of deferring any work until the first kernel launch. Compilation
++        is rejected after the process enters its execution phase.
+     """
+ 
+     assert isinstance(func, PrimFunc), f"target function must be a PrimFunc but got {type(func)}"
+@@ -165,7 +172,7 @@ def compile(
+                 func_cf.extend(compile_flags)
+         compile_flags = func_cf
+ 
+-    return cached(
++    kernel = cached(
+         func=func,
+         out_idx=out_idx,
+         execution_backend=execution_backend,
+@@ -175,8 +182,12 @@ def compile(
+         pass_configs=pass_configs,
+         compile_flags=compile_flags,
+     )
++    if env.is_explicit_compile_required():
++        kernel.prepare_for_execution()
++    return kernel
+ 
+ 
++@compilation_guard
+ def par_compile(
+     funcs: Iterable[PrimFunc[_KP, _T]],
+     out_idx: list[int] | int | None = None,
+@@ -223,6 +234,10 @@ def par_compile(
+         Default execution backend. Defaults to "auto".
+     TILELANG_VERBOSE : str
+         Set to "1", "true", "yes", or "on" to enable verbose compilation by default.
++    TILELANG_REQUIRE_EXPLICIT_COMPILE : str
++        When enabled, finish backend preparation for every compiled kernel
++        before this function returns. Compilation is rejected after the process
++        enters its execution phase.
+     """
+ 
+     # funcs may be a one-shot iterable; materialize to size the pool and reuse below.
+@@ -366,6 +381,7 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+             except NameError:
+                 self.debug_root_path = path.abspath(self.debug_root_path)
+         self._kernel_cache: dict[tuple, Kernel] = {}
++        self._explicitly_compiled_keys: set[tuple] = set()
+         self._call_form_cache: _CallFormCache = _CallFormCache()
+         self._tuner_cache: dict[tuple, Kernel] = {}
+ 
+@@ -418,6 +434,62 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+             raise ValueError("out_idx is only supported in lazy mode. In eager mode, use T.empty() to declare output tensors instead.")
+         return self.mode
+ 
++    def _explicit_compile_error(self) -> RuntimeError:
++        func_name = getattr(self.func, "__name__", "jit_kernel")
++        return RuntimeError(
++            f"No explicitly compiled specialization was found for `{func_name}` while "
++            "TILELANG_REQUIRE_EXPLICIT_COMPILE=1. Call "
++            f"`{func_name}.compile(...)` with matching tensor shapes, dtypes, strides, "
++            "and compile-time arguments before invoking it."
++        )
++
++    def _explicit_compile_cache_keys(self, *args: _P.args, **kwargs: _P.kwargs) -> set[tuple]:
++        """Return the invocation cache keys authorized by one explicit compile."""
++        key, _ = self.func.parse_args(*args, **kwargs)
++        keys = {key}
++
++        # Eager kernels may be compiled without concrete tensors by supplying
++        # T.const values as extra keyword arguments, for example
++        # ``kernel.compile(M=1024, N=1024)``. Those values belong to the phase-2
++        # specialization key when the same kernel is later called with tensors,
++        # not to the phase-1 Python call key. Register that equivalent key too.
++        if self.mode != "eager" or not self.func.tensor_args:
++            return keys
++
++        phase1_key, phase2_key = key
++        template = self.func.p1_cache.get(phase1_key)
++        matcher = None if template is None else template.matcher
++        if not matcher:
++            return keys
++
++        constexpr_names = {match[3] for match in matcher.values()}
++        signature_names = set(self.signature.parameters)
++        explicit_const_names = (set(kwargs) - signature_names) & constexpr_names
++        if not explicit_const_names:
++            return keys
++
++        alias_kwargs = {name: value for name, value in kwargs.items() if name not in explicit_const_names}
++        try:
++            alias_bound = self.func._argument_binder.bind(args, alias_kwargs)
++        except TypeError:
++            # Complex signatures using *args/**kwargs may require concrete
++            # tensor arguments. The exact explicit call key remains valid.
++            return keys
++
++        alias_key = (alias_bound.p1_key, phase2_key)
++        keys.add(alias_key)
++        self.func.p1_cache.setdefault(alias_bound.p1_key, template)
++        return keys
++
++    def _register_explicit_kernel(self, kernel: JITKernel[_KP, _T], keys: set[tuple]) -> None:
++        for key in keys:
++            self._kernel_cache[key] = kernel
++        self._explicitly_compiled_keys.update(keys)
++        # An explicit recompile replaces every canonical alias. Discard raw
++        # call-form entries so none can keep returning an older kernel object.
++        self._call_form_cache.clear()
++
++    @compilation_guard
+     def par_compile(
+         self,
+         configs: Iterable[dict[str, Any] | tuple[str, Any]],
+@@ -447,14 +519,19 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+ 
+         configs = list(configs)
+         funcs = []
++        compile_keys = []
+         for cfg in tqdm(configs, desc="Elaborating"):
+             if isinstance(cfg, tuple):
++                self.initialize_jit_mode(*cfg)
++                compile_keys.append(self._explicit_compile_cache_keys(*cfg))
+                 funcs.append(self.get_tir(*cfg))
+             elif isinstance(cfg, dict):
++                self.initialize_jit_mode(**cfg)
++                compile_keys.append(self._explicit_compile_cache_keys(**cfg))
+                 funcs.append(self.get_tir(**cfg))
+             else:
+                 raise ValueError(f"Invalid config type: {type(cfg)}, expected tuple or dict.")
+-        return par_compile(
++        kernels = par_compile(
+             funcs,
+             out_idx=self.out_idx,
+             execution_backend=self.execution_backend,
+@@ -467,6 +544,11 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+             ignore_error=ignore_error,
+         )
+ 
++        for keys, kernel in zip(compile_keys, kernels):
++            if kernel is not None:
++                self._register_explicit_kernel(kernel, keys)
++        return kernels
++
+     def prepare(
+         self,
+         calls: Iterable[tuple[tuple[Any, ...], dict[str, Any]]],
+@@ -480,7 +562,7 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+         """
+         return prepare([(self, args, kwargs) for args, kwargs in calls], num_workers, progress)
+ 
+-    def compile(self, *args: _P.args, **kwargs: _P.kwargs) -> _Ret:
++    def _compile_kernel(self, *args: _P.args, **kwargs: _P.kwargs) -> JITKernel[_KP, _T]:
+         prim_func = self.get_tir(*args, **kwargs)
+         func_pass_configs = prim_func.attrs.get("tilelang_pass_configs", {}) if prim_func.attrs else {}
+         effective_pass_configs = {**func_pass_configs, **(self.pass_configs or {})}
+@@ -522,6 +604,16 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+ 
+         return kernel_result
+ 
++    @compilation_guard
++    def compile(self, *args: _P.args, **kwargs: _P.kwargs) -> JITKernel[_KP, _T]:
++        """Explicitly compile and register one specialization for later invocation."""
++        kwargs.update(kwargs.pop("__tune_params", {}))
++        self.initialize_jit_mode(*args, **kwargs)
++        keys = self._explicit_compile_cache_keys(*args, **kwargs)
++        kernel = self._compile_kernel(*args, **kwargs)
++        self._register_explicit_kernel(kernel, keys)
++        return kernel
++
+     def parse_cache_key(self, *args: _P.args, **kwargs: _P.kwargs):
+         tune_params = kwargs.pop("__tune_params", {})
+         key_args_tuple = args
+@@ -561,6 +653,7 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+ 
+         has_tune_params = "__tune_params" in kwargs
+         kwargs.update(kwargs.pop("__tune_params", {}))
++        require_explicit_compile = env.is_explicit_compile_required()
+ 
+         # infer mode early, before parse_args needs it
+         if self.mode == "auto":
+@@ -568,16 +661,19 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+             self.func.set_mode(self.mode)
+ 
+         call_form_key = None
+-        if self.is_lazy_mode() and self._can_use_call_form_cache(has_tune_params):
++        if not require_explicit_compile and self.is_lazy_mode() and self._can_use_call_form_cache(has_tune_params):
+             kernel, call_form_key = self._call_form_cache.lookup(args, kwargs)
+             if kernel is not _CALL_FORM_CACHE_MISS:
+                 return kernel
+ 
+         key, kernel_args = self.func.parse_args(*args, **kwargs)
+         kernel = self._kernel_cache.get(key, None)
+-        if kernel is None:
++        if require_explicit_compile:
++            if key not in self._explicitly_compiled_keys or kernel is None:
++                raise self._explicit_compile_error()
++        elif kernel is None:
+             try:
+-                kernel = self.compile(*args, **kwargs)
++                kernel = self._compile_kernel(*args, **kwargs)
+             except KernelNotPreparedError as error:
+                 name = getattr(self.func, "__name__", repr(self.func))
+                 call = ", ".join([*map(repr, args), *(f"{k}={v!r}" for k, v in kwargs.items())])
+@@ -724,6 +820,14 @@ def jit(
+         Directory to save compiled kernel source for debugging.
+     compile_flags : list[str] | str | None
+         Additional compiler flags.
++
++    Environment Variables
++    ---------------------
++    TILELANG_REQUIRE_EXPLICIT_COMPILE : str
++        Set to "1", "true", "yes", or "on" to reject specialization cache
++        misses during decorated invocation. Register each specialization first
++        with `.compile()` or `.par_compile()`. The first kernel launch seals
++        compilation for the process; later compilation calls raise an error.
+     """
+ 
+     compile_args = dict(
+diff --git a/tilelang/jit/adapter/base.py b/tilelang/jit/adapter/base.py
+index 3c4465db..adac1511 100644
+--- a/tilelang/jit/adapter/base.py
++++ b/tilelang/jit/adapter/base.py
+@@ -10,6 +10,7 @@ from typing import Any
+ import torch
+ 
+ from tilelang.engine.param import KernelParam
++from tilelang.jit.compile_phase import guard_kernel_launch
+ 
+ 
+ @dataclass(frozen=True)
+@@ -143,6 +144,14 @@ class BaseKernelAdapter(ABC):
+     def __call__(self, *args: Any, **kwds: Any) -> Any:
+         return self.func(*args, **kwds)
+ 
++    def prepare_for_execution(self) -> None:
++        """Finish backend work that would otherwise occur on first invocation.
++
++        Most adapters compile and load their executable during construction.
++        Backends with an additional lazy preparation step override this method.
++        """
++        return None
++
+     def get_kernel_source(self, kernel_only: bool = True) -> str:
+         if kernel_only:
+             return self.mod.imports[0].inspect_source()
+@@ -150,7 +159,7 @@ class BaseKernelAdapter(ABC):
+             return self.mod.inspect_source() + "\n\n" + self.mod.imports[0].inspect_source()
+ 
+     def _post_init(self):
+-        self.func = self._convert_torch_func()
++        self.func = guard_kernel_launch(self._convert_torch_func())
+ 
+     @staticmethod
+     def _normalize_cached_text_source(source: CachedTextSourceLike) -> CachedTextSource:
+diff --git a/tilelang/jit/adapter/cutedsl/adapter.py b/tilelang/jit/adapter/cutedsl/adapter.py
+index 7df90f6f..7d6a504b 100644
+--- a/tilelang/jit/adapter/cutedsl/adapter.py
++++ b/tilelang/jit/adapter/cutedsl/adapter.py
+@@ -357,6 +357,22 @@ class CuTeDSLKernelAdapter(BaseKernelAdapter):
+ 
+         return result
+ 
++    def prepare_for_execution(self) -> None:
++        """Reject a fresh runtime-specialized CuTeDSL artifact.
++
++        CuTeDSL's final ``cute.compile`` needs runtime tensor metadata and is
++        intentionally performed by the generated module on its first call.
++        Silently accepting this adapter in explicit-compile mode would violate
++        that mode's compile-before-execution guarantee.
++        """
++        if getattr(self.pymodule, "_cubin_needs_generation", False):
++            raise RuntimeError(
++                "TILELANG_REQUIRE_EXPLICIT_COMPILE=1 cannot prepare a fresh "
++                "CuTeDSL cubin without runtime tensor metadata. Use the tvm_ffi, "
++                "cython, or nvrtc execution backend, or a CuTeDSL cache entry "
++                "whose cubin was generated previously."
++            )
++
+     def _save_cubin_to_cache_if_needed(self):
+         """Save cubin to cache directory after first execution.
+ 
+diff --git a/tilelang/jit/adapter/tvm_ffi.py b/tilelang/jit/adapter/tvm_ffi.py
+index 22c5fec6..d67f9c36 100644
+--- a/tilelang/jit/adapter/tvm_ffi.py
++++ b/tilelang/jit/adapter/tvm_ffi.py
+@@ -164,6 +164,15 @@ class TVMFFIKernelAdapter(BaseKernelAdapter):
+         """Return the lazy executable, or the runnable module loaded from disk cache."""
+         return self._get_executable()
+ 
++    def prepare_for_execution(self) -> None:
++        """Compile and link a fresh TVM executable before its first launch."""
++        # Disk-cache restores install an already runnable Module and clear
++        # ``rt_mod``. Freshly lowered kernels retain ``rt_mod`` and otherwise
++        # let Executable.__call__ trigger this JIT step on first invocation.
++        if getattr(self, "rt_mod", None) is None:
++            return
++        self._get_executable().jit(**COMPILE_ARGS)
++
+     def _uses_ffi_callee_allocated_output_abi(self) -> bool:
+         """Whether lowering gives this kernel the callee-allocated main ABI."""
+         if not self.result_idx:
+diff --git a/tilelang/jit/compile_phase.py b/tilelang/jit/compile_phase.py
+new file mode 100644
+index 00000000..d03fecd4
+--- /dev/null
++++ b/tilelang/jit/compile_phase.py
+@@ -0,0 +1,156 @@
++"""Process-wide compilation phase enforcement for strict JIT execution."""
++
++from __future__ import annotations
++
++from collections.abc import Callable, Iterator
++from contextlib import contextmanager
++from functools import wraps
++import threading
++from typing import Any, TypeVar, cast
++
++from tilelang.env import env
++
++
++_F = TypeVar("_F", bound=Callable[..., Any])
++_COMPILING = "compiling"
++_SEALING = "sealing"
++_EXECUTING = "executing"
++
++
++class _CompilePhaseCoordinator:
++    """Coordinate one irreversible compile-to-execute transition per process."""
++
++    def __init__(self) -> None:
++        self._condition = threading.Condition()
++        self._local = threading.local()
++        self._state = _COMPILING
++        self._active_compilations = 0
++
++    @contextmanager
++    def compilation(self) -> Iterator[None]:
++        """Register compilation work or reject it after execution has begun."""
++        if not env.is_explicit_compile_required():
++            yield
++            return
++
++        depth = getattr(self._local, "compilation_depth", 0)
++        if depth:
++            self._local.compilation_depth = depth + 1
++            try:
++                yield
++            finally:
++                self._local.compilation_depth = depth
++            return
++
++        with self._condition:
++            if self._state != _COMPILING:
++                raise RuntimeError(
++                    "TileLang compilation is sealed while TILELANG_REQUIRE_EXPLICIT_COMPILE=1. "
++                    "Compile every kernel before the first launch or before calling "
++                    "tilelang.seal_compilation(), or start a new Python process for a new "
++                    "compilation phase."
++                )
++            self._active_compilations += 1
++            self._local.compilation_depth = 1
++
++        try:
++            yield
++        finally:
++            self._local.compilation_depth = 0
++            with self._condition:
++                self._active_compilations -= 1
++                if self._active_compilations == 0:
++                    self._condition.notify_all()
++
++    def seal(self) -> None:
++        """Wait for active compiles, then irreversibly enter execution phase."""
++        if not env.is_explicit_compile_required():
++            return
++        if getattr(self._local, "compilation_depth", 0):
++            raise RuntimeError(
++                "Cannot launch a TileLang kernel from a thread that is still compiling while "
++                "TILELANG_REQUIRE_EXPLICIT_COMPILE=1. Finish compilation before execution."
++            )
++
++        with self._condition:
++            if self._state == _EXECUTING:
++                return
++            if self._state == _COMPILING:
++                self._state = _SEALING
++
++            while self._state == _SEALING and self._active_compilations:
++                self._condition.wait()
++
++            if self._state == _SEALING:
++                self._state = _EXECUTING
++                self._condition.notify_all()
++
++    def is_sealed(self) -> bool:
++        """Return whether this process has entered its execution phase."""
++        with self._condition:
++            return self._state == _EXECUTING
++
++    def reset_for_testing(self) -> None:
++        """Reset global state for an isolated test; never expose this as public API."""
++        with self._condition:
++            if self._active_compilations:
++                raise RuntimeError("Cannot reset TileLang compilation phase while compilation is active.")
++            self._state = _COMPILING
++            self._local.compilation_depth = 0
++            self._condition.notify_all()
++
++
++_COORDINATOR = _CompilePhaseCoordinator()
++
++
++@contextmanager
++def compilation_scope() -> Iterator[None]:
++    """Guard compilation work under the process-wide strict-mode phase."""
++    with _COORDINATOR.compilation():
++        yield
++
++
++def compilation_guard(func: _F) -> _F:
++    """Decorate a compilation entry point with the strict-mode phase guard."""
++
++    @wraps(func)
++    def guarded(*args: Any, **kwargs: Any) -> Any:
++        with compilation_scope():
++            return func(*args, **kwargs)
++
++    return cast(_F, guarded)
++
++
++def guard_kernel_launch(func: _F) -> _F:
++    """Wrap a kernel callable so its first launch seals strict-mode compilation."""
++    if not env.is_explicit_compile_required():
++        return func
++
++    @wraps(func)
++    def guarded(*args: Any, **kwargs: Any) -> Any:
++        seal_compilation()
++        return func(*args, **kwargs)
++
++    return cast(_F, guarded)
++
++
++def seal_compilation() -> None:
++    """Finish the strict compilation phase before launching kernels.
++
++    With ``TILELANG_REQUIRE_EXPLICIT_COMPILE=1``, this waits for active
++    compilation calls and permanently rejects new compilation in the current
++    process. Kernel launch callables invoke it automatically; harnesses may
++    call it explicitly to establish the resource-allocation boundary. It is a
++    no-op when explicit compilation mode is disabled.
++    """
++    _COORDINATOR.seal()
++
++
++def is_compilation_sealed() -> bool:
++    """Return whether strict compilation is sealed in the current process."""
++    return _COORDINATOR.is_sealed()
++
++
++def _reset_compilation_phase_for_testing() -> None:
++    """Reset the process-wide phase for test isolation."""
++    _COORDINATOR.reset_for_testing()
+diff --git a/tilelang/jit/kernel.py b/tilelang/jit/kernel.py
+index e7b77fd7..215d5dd1 100644
+--- a/tilelang/jit/kernel.py
++++ b/tilelang/jit/kernel.py
+@@ -22,6 +22,7 @@ from tilelang.profiler import Profiler, TensorSupplyType
+ from tilelang.contrib import nvcc as tl_nvcc
+ from tilelang.contrib.hip_resource_info import pop_recorded, reset_recorder
+ from tilelang.jit.abi import prepare_tvm_ffi_callee_allocated_outputs
++from tilelang.jit.compile_phase import compilation_guard
+ from tilelang.jit.diagnostics import jit_phase
+ from tilelang.transform import PassConfigKey
+ from tilelang.transform.pass_config import normalize_pass_configs
+@@ -63,6 +64,7 @@ class JITKernel(Generic[_P, _T]):
+     config: dict[str, Any] = None
+     ref_latency: float = None
+ 
++    @compilation_guard
+     def __init__(
+         self,
+         func: PrimFunc = None,
+@@ -105,6 +107,7 @@ class JITKernel(Generic[_P, _T]):
+         """
+         self.prim_func = func
+         self.verbose = verbose
++        self._execution_prepared = False
+ 
+         self.pass_configs = normalize_pass_configs(pass_configs)
+ 
+@@ -145,8 +148,11 @@ class JITKernel(Generic[_P, _T]):
+             logger.info(f"TileLang completes to compile kernel `{func_name}`")
+ 
+         self._set_adapter(adapter)
++        if env.is_explicit_compile_required():
++            self.prepare_for_execution()
+ 
+     @classmethod
++    @compilation_guard
+     def from_database(
+         cls,
+         func: PrimFunc,
+@@ -199,6 +205,8 @@ class JITKernel(Generic[_P, _T]):
+             compile_flags=compile_flags,
+         )
+         instance._set_adapter(adapter)
++        if env.is_explicit_compile_required():
++            instance.prepare_for_execution()
+         return instance
+ 
+     def _set_adapter(self, adapter: BaseKernelAdapter) -> None:
+@@ -227,6 +235,14 @@ class JITKernel(Generic[_P, _T]):
+         """
+         return self.torch_function(*args, **kwds)
+ 
++    @compilation_guard
++    def prepare_for_execution(self) -> JITKernel[_P, _T]:
++        """Finish backend preparation that would otherwise occur on first launch."""
++        if not getattr(self, "_execution_prepared", False):
++            self.adapter.prepare_for_execution()
++            self._execution_prepared = True
++        return self
++
+     def _compile_and_create_adapter(
+         self,
+         tilelang_func: PrimFunc,

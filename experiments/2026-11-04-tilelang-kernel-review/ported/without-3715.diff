@@ -1,0 +1,236 @@
+diff --git a/docs/programming_guides/instructions.md b/docs/programming_guides/instructions.md
+index e2d195b5..f61fd532 100644
+--- a/docs/programming_guides/instructions.md
++++ b/docs/programming_guides/instructions.md
+@@ -197,9 +197,7 @@ Compute primitives
+   of larger reductions and unpacked batched reductions. Sub-warp, strided,
+   packed, FP64, and unsupported dtype/operator combinations retain the shuffle
+   implementation, as do targets without the required instructions. Cross-warp
+-  reductions perform the in-warp stage first and collapse the cross-warp levels
+-  into a single shared-memory exchange (two barriers per reduction regardless
+-  of the number of warps).
++  shared-memory exchanges and barriers are unchanged.
+ - Scans: `T.cumsum`, `T.cummax`, finalize: `T.finalize_reducer`.
+ - Warp reducers: `T.warp_reduce_sum/max/min/bitand/bitor`.
+ - Elementwise math: TIR ops (`T.exp`, `T.log`, `T.max`, `T.min`, `T.rsqrt`, ...).
+diff --git a/src/tl_templates/cuda/reduce.h b/src/tl_templates/cuda/reduce.h
+index 3e4540d2..c1810efe 100644
+--- a/src/tl_templates/cuda/reduce.h
++++ b/src/tl_templates/cuda/reduce.h
+@@ -282,156 +282,54 @@ struct AllReduce {
+ private:
+   static constexpr bool full_warp =
+       threads == 32 && scale == 1 && thread_offset % 32 == 0;
+-  static constexpr bool is_idempotent =
+-      std::is_same_v<Reducer, MaxOp> || std::is_same_v<Reducer, MinOp> ||
+-      std::is_same_v<Reducer, BitAndOp> || std::is_same_v<Reducer, BitOrOp>;
+-  static constexpr bool has_zero_identity =
+-      std::is_same_v<Reducer, SumOp> || std::is_same_v<Reducer, BitXorOp>;
+-  static constexpr int in_warp_scale = scale < 32 ? scale : 32;
+-  static constexpr int cross_scale = scale < 32 ? 32 : scale;
+-  static constexpr int cross_radix =
+-      threads > cross_scale ? (threads / cross_scale) : 1;
+-  static constexpr int in_warp_lanes = 32 / in_warp_scale;
+-  static constexpr int merge_lanes =
+-      cross_radix < in_warp_lanes ? cross_radix : in_warp_lanes;
+-  static constexpr int items_per_lane =
+-      cross_radix > merge_lanes ? (cross_radix / merge_lanes) : 1;
+-
+-  using InWarp = AllReduce<Reducer, 32, in_warp_scale, thread_offset, Barrier,
+-                           batch_size, workspace_stride>;
+-  using CrossWarpInLane =
+-      AllReduce<Reducer, merge_lanes * in_warp_scale, in_warp_scale,
+-                thread_offset, Barrier, batch_size, workspace_stride>;
++
+   using Next = AllReduce<Reducer, threads / 2, scale, thread_offset, Barrier,
+                          batch_size, workspace_stride>;
+ 
+   template <typename T>
+   static TL_DEVICE T butterfly_reduce_scalar(T x, T *red_buf) {
+-    if constexpr (threads > 32) {
+-      const int rel_tid = threadIdx.x - thread_offset;
++    constexpr int offset = threads / 2;
++    if constexpr (offset >= 32) {
+       Barrier::template sync<1>();
+-      if constexpr (scale < 32) {
+-        x = InWarp::run(x);
+-        red_buf[rel_tid] = x;
+-        Barrier::template sync<2>();
+-        const int lane_in_group = (rel_tid & 31) / in_warp_scale;
+-        const int warp_base =
+-            (lane_in_group & (merge_lanes - 1)) * items_per_lane;
+-        const int group_base = rel_tid & ~(threads - cross_scale);
+-        const int smem_base = group_base + warp_base * cross_scale;
+-        T acc = red_buf[smem_base];
+-#pragma unroll 4
+-        for (int k = 1; k < items_per_lane; ++k) {
+-          acc = Reducer()(acc, red_buf[smem_base + k * cross_scale]);
+-        }
+-        if constexpr (scale == 1 && thread_offset % 32 == 0 &&
+-                      sizeof(T) <= sizeof(float) &&
+-                      (is_idempotent ||
+-                       (has_zero_identity && std::is_integral_v<T>))) {
+-          if constexpr (!is_idempotent && merge_lanes < 32) {
+-            if (lane_in_group >= merge_lanes) {
+-              acc = static_cast<T>(0);
+-            }
+-          }
+-          return InWarp::run(acc);
+-        } else {
+-          return CrossWarpInLane::run(acc);
+-        }
+-      } else {
+-        red_buf[rel_tid] = x;
+-        Barrier::template sync<2>();
+-        const int base = rel_tid & ~(threads - cross_scale);
+-        T acc = red_buf[base];
+-#pragma unroll 4
+-        for (int k = 1; k < cross_radix; ++k) {
+-          acc = Reducer()(acc, red_buf[base + k * cross_scale]);
+-        }
+-        return acc;
+-      }
++      red_buf[threadIdx.x - thread_offset] = x;
++      Barrier::template sync<2>();
++      x = Reducer()(x, red_buf[(threadIdx.x - thread_offset) ^ offset]);
+     } else {
+-      constexpr int offset = threads / 2;
+       x = Reducer()(x, tl::shfl_xor_sync(uint32_t(-1), x, offset));
+-      if constexpr (offset == scale) {
+-        return x;
+-      } else {
+-        return Next::run(x, red_buf);
+-      }
++    }
++    if constexpr (offset == scale) {
++      return x;
++    } else {
++      return Next::run(x, red_buf);
+     }
+   }
+ 
+   template <typename T>
+   static TL_DEVICE void butterfly_reduce_batch(T *x, T *red_buf) {
+-    if constexpr (threads > 32) {
+-      const int rel_tid = threadIdx.x - thread_offset;
++    constexpr int offset = threads / 2;
++    if constexpr (offset >= 32) {
+       Barrier::template sync<1>();
+-      if constexpr (scale < 32) {
+-        InWarp::run_batch(x);
+-#pragma unroll
+-        for (int i = 0; i < batch_size; i++) {
+-          red_buf[rel_tid + i * workspace_stride] = x[i];
+-        }
+-        Barrier::template sync<2>();
+-        const int lane_in_group = (rel_tid & 31) / in_warp_scale;
+-        const int warp_base =
+-            (lane_in_group & (merge_lanes - 1)) * items_per_lane;
+-        const int group_base = rel_tid & ~(threads - cross_scale);
+-        const int smem_base = group_base + warp_base * cross_scale;
+-#pragma unroll
+-        for (int i = 0; i < batch_size; i++) {
+-          T acc = red_buf[smem_base + i * workspace_stride];
+-#pragma unroll 4
+-          for (int k = 1; k < items_per_lane; ++k) {
+-            acc = Reducer()(
+-                acc,
+-                red_buf[smem_base + k * cross_scale + i * workspace_stride]);
+-          }
+-          if constexpr (scale == 1 && thread_offset % 32 == 0 &&
+-                        sizeof(T) <= sizeof(float) && !is_idempotent &&
+-                        has_zero_identity && std::is_integral_v<T> &&
+-                        merge_lanes < 32) {
+-            if (lane_in_group >= merge_lanes) {
+-              acc = static_cast<T>(0);
+-            }
+-          }
+-          x[i] = acc;
+-        }
+-        if constexpr (scale == 1 && thread_offset % 32 == 0 &&
+-                      sizeof(T) <= sizeof(float) &&
+-                      (is_idempotent ||
+-                       (has_zero_identity && std::is_integral_v<T>))) {
+-          InWarp::run_batch(x);
+-        } else {
+-          CrossWarpInLane::run_batch(x);
+-        }
+-      } else {
+ #pragma unroll
+-        for (int i = 0; i < batch_size; i++) {
+-          red_buf[rel_tid + i * workspace_stride] = x[i];
+-        }
+-        Barrier::template sync<2>();
+-        const int base = rel_tid & ~(threads - cross_scale);
++      for (int i = 0; i < batch_size; i++) {
++        red_buf[(threadIdx.x - thread_offset) + i * workspace_stride] = x[i];
++      }
++      Barrier::template sync<2>();
+ #pragma unroll
+-        for (int i = 0; i < batch_size; i++) {
+-          T acc = red_buf[base + i * workspace_stride];
+-#pragma unroll 4
+-          for (int k = 1; k < cross_radix; ++k) {
+-            acc = Reducer()(
+-                acc, red_buf[base + k * cross_scale + i * workspace_stride]);
+-          }
+-          x[i] = acc;
+-        }
++      for (int i = 0; i < batch_size; i++) {
++        x[i] =
++            Reducer()(x[i], red_buf[((threadIdx.x - thread_offset) ^ offset) +
++                                    i * workspace_stride]);
+       }
+     } else {
+-      constexpr int offset = threads / 2;
+ #pragma unroll
+       for (int i = 0; i < batch_size; i++) {
+         x[i] = Reducer()(x[i], tl::shfl_xor_sync(uint32_t(-1), x[i], offset));
+       }
+-      if constexpr (offset == scale) {
+-        return;
+-      } else {
+-        Next::run_batch(x, red_buf);
+-      }
++    }
++    if constexpr (offset == scale) {
++      return;
++    } else {
++      Next::run_batch(x, red_buf);
+     }
+   }
+ };
+diff --git a/testing/python/language/test_tilelang_language_reduce_redux.py b/testing/python/language/test_tilelang_language_reduce_redux.py
+index 84dfe112..bfc1418f 100644
+--- a/testing/python/language/test_tilelang_language_reduce_redux.py
++++ b/testing/python/language/test_tilelang_language_reduce_redux.py
+@@ -239,28 +239,13 @@ def test_reduce_redux_integer_runtime(operation, dtype, width, batch, clear, exe
+ 
+ 
+ @tilelang.testing.requires_cuda
+-@pytest.mark.parametrize(
+-    ("width", "scale", "thread_offset"),
+-    [(16, 1, 0), (32, 2, 0), (64, 1, 32), (256, 1, 0), (128, 2, 0), (64, 4, 0), (32, 8, 0), (16, 16, 0), (8, 32, 0)],
+-)
++@pytest.mark.parametrize(("width", "scale", "thread_offset"), [(16, 1, 0), (32, 2, 0), (64, 1, 32)])
+ def test_reduce_redux_layout_runtime(width, scale, thread_offset):
+     inputs = torch.arange(4 * width * scale, dtype=torch.int32).reshape(4, width, scale).cuda()
+     compiled = tilelang.compile(_make_kernel("sum", "int32", width, scale=scale, thread_offset=thread_offset), out_idx=-1)
+     torch.testing.assert_close(compiled(inputs).cpu().to(torch.int64), _reference(inputs, "sum", True), rtol=0, atol=0)
+ 
+ 
+-@tilelang.testing.requires_cuda
+-@pytest.mark.parametrize(
+-    ("width", "scale", "batch"),
+-    [(64, 1, 1), (128, 1, 1), (256, 1, 1), (64, 4, 1), (16, 16, 1), (8, 32, 1), (128, 1, 2), (64, 4, 2)],
+-)
+-def test_reduce_single_round_cross_warp_ptx(width, scale, batch):
+-    _, ptx_64 = _compile_ptx(_make_kernel("max", "float32", 64, scale=1, batch=batch), "sm_80")
+-    _, ptx = _compile_ptx(_make_kernel("max", "float32", width, scale=scale, batch=batch), "sm_80")
+-    assert ptx.count("bar.sync") == ptx_64.count("bar.sync")
+-    assert ptx.count("st.shared") == ptx_64.count("st.shared")
+-
+-
+ @tilelang.testing.requires_cuda
+ @pytest.mark.parametrize("operation", ["max", "min"])
+ @pytest.mark.parametrize(

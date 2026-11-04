@@ -1,0 +1,639 @@
+diff --git a/src/transform/thread_storage_sync.cc b/src/transform/thread_storage_sync.cc
+index 1c3dccb7..04931aba 100644
+--- a/src/transform/thread_storage_sync.cc
++++ b/src/transform/thread_storage_sync.cc
+@@ -30,14 +30,9 @@
+ #include "tir/transforms/ir_utils.h"
+ #include "tvm/ir/expr.h"
+ #include <algorithm>
+-#include <array>
+-#include <map>
+-#include <optional>
+ #include <string>
+-#include <tuple>
+ #include <tvm/arith/analyzer.h>
+ #include <tvm/arith/int_set.h>
+-#include <tvm/ffi/container/variant.h>
+ #include <tvm/ir/attrs.h>
+ #include <tvm/ir/cast.h>
+ #include <tvm/runtime/logging.h>
+@@ -264,44 +259,6 @@ PrimExpr MakeLinearThreadId(const Array<IterVar> &thread_vars) {
+   return linear_thread_id;
+ }
+ 
+-using SyncConstraintMap = std::unordered_map<Call, std::vector<ConstrSet>,
+-                                             ObjectPtrHash, ObjectPtrEqual>;
+-
+-class SyncConstraintCollector : public ConstrVisitor {
+-public:
+-  static SyncConstraintMap Collect(const Stmt &stmt) {
+-    SyncConstraintCollector collector;
+-    collector(stmt);
+-    return std::move(collector.constraints_);
+-  }
+-
+-private:
+-  void VisitExpr_(const CallNode *op) final {
+-    if (op->op.same_as(builtin::tvm_storage_sync()) && op->args.size() == 1) {
+-      // A shared Call node can occur under different predicates. Keep every
+-      // occurrence so that proving one context cannot authorize another.
+-      constraints_[GetRef<Call>(op)].push_back(GetConstrSet());
+-    }
+-    ConstrVisitor::VisitExpr_(op);
+-  }
+-
+-  void VisitStmt_(const SBlockNode *op) final {
+-    size_t old_size = constr_stack_.size();
+-    for (const IterVar &iv : op->iter_vars) {
+-      constr_stack_.emplace_back(iv->var, iv->dom);
+-    }
+-    ConstrVisitor::VisitStmt_(op);
+-    constr_stack_.resize(old_size);
+-  }
+-
+-  void VisitStmt_(const SBlockRealizeNode *op) final {
+-    auto guard = MakeGuard(op->predicate);
+-    ConstrVisitor::VisitStmt_(op);
+-  }
+-
+-  SyncConstraintMap constraints_;
+-};
+-
+ } // namespace
+ 
+ class ThreadPartialSyncRewriter : public IRMutatorWithAnalyzer {
+@@ -309,10 +266,10 @@ public:
+   static Stmt Rewrite(Stmt stmt, int warp_size = 32) {
+     arith::Analyzer analyzer;
+     ThreadPartialSyncRewriter rewriter(&analyzer, warp_size);
+-    rewriter.sync_constraints_ = SyncConstraintCollector::Collect(stmt);
+-    // Reserve ids from earlier ThreadSync invocations and explicit partial
+-    // syncs. Reusing one for a disjoint thread range would let the two groups
+-    // complete each other's barrier phases.
++    // ThreadSync runs once per storage scope ("shared", then "shared.dyn").
++    // The earlier run has already assigned named-barrier ids; a fresh
++    // numbering would hand the same id to a disjoint thread range, and two
++    // groups syncing on one `bar.sync id, count` complete each other's phases.
+     PostOrderVisit(stmt, [&rewriter](const ObjectRef &node) {
+       const auto *call = node.as<CallNode>();
+       if (call && call->op.same_as(builtin::tvm_storage_sync()) &&
+@@ -326,10 +283,6 @@ public:
+   }
+ 
+ private:
+-  // Thread bounds, participant count, and scope identify a barrier. Proven
+-  // dense groups use an empty scope to allow reuse across storage scopes.
+-  using BarrierKey = std::tuple<std::array<int64_t, 6>, size_t, std::string>;
+-
+   explicit ThreadPartialSyncRewriter(arith::Analyzer *analyzer, int warp_size)
+       : IRMutatorWithAnalyzer(analyzer), warp_size_(warp_size) {}
+ 
+@@ -348,13 +301,13 @@ private:
+           return IRMutatorWithAnalyzer::VisitStmt_(op);
+         }
+ 
+-        return ProcessSharedSync_(GetRef<Call>(call), scope);
++        return ProcessSharedSync(call, scope);
+       }
+     }
+     return IRMutatorWithAnalyzer::VisitStmt_(op);
+   }
+ 
+-  Stmt ProcessSharedSync_(const Call &call, const std::string &scope) {
++  Stmt ProcessSharedSync(const CallNode *op, const std::string &scope) {
+     // Get thread bounds
+     auto bound_tx = analyzer_->const_int_bound(tx_);
+     auto bound_ty = analyzer_->const_int_bound(ty_);
+@@ -364,23 +317,21 @@ private:
+     if (IsFullThreadExtent(tx_, bound_tx) &&
+         IsFullThreadExtent(ty_, bound_ty) &&
+         IsFullThreadExtent(tz_, bound_tz)) {
+-      return Evaluate(IRMutatorWithAnalyzer::VisitExpr_(call.get()));
+-    }
+-
+-    // Prove that every thread in the bounding box participates before sharing
+-    // an ID across scopes. A successful proof also avoids enumeration.
+-    auto dense_count =
+-        TryGetDenseThreadCount_(call, {bound_tx, bound_ty, bound_tz});
+-    size_t thread_count = dense_count
+-                              ? *dense_count
+-                              : CalculateThreadExtent(tx_, bound_tx) *
+-                                    CalculateThreadExtent(ty_, bound_ty) *
+-                                    CalculateThreadExtent(tz_, bound_tz);
+-    BarrierKey key{{bound_tx->min_value, bound_tx->max_value,
+-                    bound_ty->min_value, bound_ty->max_value,
+-                    bound_tz->min_value, bound_tz->max_value},
+-                   thread_count,
+-                   dense_count ? "" : scope};
++      return Evaluate(IRMutatorWithAnalyzer::VisitExpr_(op));
++    }
++
++    // Calculate thread extents
++    auto extent_tx = CalculateThreadExtent(tx_, bound_tx);
++    auto extent_ty = CalculateThreadExtent(ty_, bound_ty);
++    auto extent_tz = CalculateThreadExtent(tz_, bound_tz);
++
++    // Create or get barrier info
++    ThreadBoundKey key{bound_tx->min_value, bound_tx->max_value,
++                       bound_ty->min_value, bound_ty->max_value,
++                       bound_tz->min_value, bound_tz->max_value};
++
++    auto [barrier_id, thread_count] =
++        GetOrCreateBarrier(key, extent_tx, extent_ty, extent_tz);
+     if (thread_count % warp_size_ != 0) {
+       // TODO(lei): This is a workaround for the case where the thread count is
+       // not a multiple of the warp size. we should enhance the pass to analysis
+@@ -395,16 +346,18 @@ private:
+     }
+ 
+     // Create new sync call with barrier info
+-    size_t barrier_id = GetOrCreateBarrierId_(key);
+     Array<PrimExpr> new_args = {StringImm(scope),
+                                 IntImm(DataType::Int(32), barrier_id),
+                                 IntImm(DataType::Int(32), thread_count)};
+-    return Evaluate(Call(call->dtype, call->op, new_args));
++    return Evaluate(Call(op->dtype, op->op, new_args));
+   }
+ 
+-  size_t GetOrCreateBarrierId_(const BarrierKey &key) {
+-    if (auto it = barrier_ids_.find(key); it != barrier_ids_.end()) {
+-      return it->second;
++  std::pair<size_t, size_t> GetOrCreateBarrier(const ThreadBoundKey &key,
++                                               size_t extent_tx,
++                                               size_t extent_ty,
++                                               size_t extent_tz) {
++    if (barrier_id_map_.count(key)) {
++      return {barrier_id_map_[key], thread_count_map_[key]};
+     }
+ 
+     size_t barrier_id =
+@@ -412,102 +365,13 @@ private:
+     while (used_barrier_ids_.count(barrier_id)) {
+       ++barrier_id;
+     }
++    size_t thread_count = extent_tx * extent_ty * extent_tz;
++
+     used_barrier_ids_.insert(barrier_id);
+-    barrier_ids_[key] = barrier_id;
+-    return barrier_id;
+-  }
++    barrier_id_map_[key] = barrier_id;
++    thread_count_map_[key] = thread_count;
+ 
+-  std::optional<size_t> TryGetDenseThreadCount_(
+-      const Call &call,
+-      const std::array<arith::ConstIntBound, 3> &bounds) const {
+-    auto it = sync_constraints_.find(call);
+-    if (it == sync_constraints_.end()) {
+-      return std::nullopt;
+-    }
+-    std::array<IterVar, 3> thread_vars{tx_, ty_, tz_};
+-    size_t thread_count = 1;
+-    Array<Range> ranges;
+-    for (size_t i = 0; i < thread_vars.size(); ++i) {
+-      int64_t min = 0, extent = 1;
+-      if (analyzer_->const_int_bound.IsBound(thread_vars[i]->var)) {
+-        const auto &bound = bounds[i];
+-        if (bound->min_value == arith::ConstIntBound::kNegInf ||
+-            bound->max_value == arith::ConstIntBound::kPosInf ||
+-            bound->min_value > bound->max_value) {
+-          return std::nullopt;
+-        }
+-        min = bound->min_value;
+-        extent = bound->max_value - min + 1;
+-      }
+-      DataType dtype = thread_vars[i]->var.dtype();
+-      ranges.push_back(Range::FromMinExtent(make_const(dtype, min),
+-                                            make_const(dtype, extent)));
+-      thread_count *= extent;
+-    }
+-
+-    for (const ConstrSet &context : it->second) {
+-      // The current analyzer already assumes the branch predicates. Proving
+-      // them there would be circular; start with only the bounding box.
+-      arith::Analyzer proof;
+-      std::unordered_set<Var, ObjectPtrHash, ObjectPtrEqual> varying_vars;
+-      for (size_t i = 0; i < thread_vars.size(); ++i) {
+-        proof.Bind(thread_vars[i]->var, ranges[i]);
+-        varying_vars.insert(thread_vars[i]->var);
+-      }
+-      auto is_uniform = [&](const PrimExpr &expr) {
+-        bool uniform = true;
+-        PostOrderVisit(expr, [&](const ObjectRef &node) {
+-          if (const auto *var = node.as<VarNode>()) {
+-            uniform &= !var->dtype.is_handle() &&
+-                       !varying_vars.count(GetRef<Var>(var));
+-          } else if (const auto *call = node.as<CallNode>()) {
+-            // Pure calls can still read implicit thread state, e.g.
+-            // get_warp_idx(). Only look through the identity hint likely().
+-            uniform &= call->op.same_as(builtin::likely());
+-          }
+-        });
+-        return uniform;
+-      };
+-      Array<PrimExpr> predicates;
+-      for (const Constr &c : context.constrs_) {
+-        if (c.kind == Constr::kConstr) {
+-          if (!c.value.dtype().is_scalar() ||
+-              SideEffect(c.value) > CallEffectKind::kPure) {
+-            return std::nullopt;
+-          }
+-          predicates.push_back(c.value);
+-        } else if (c.kind == Constr::kBindValue) {
+-          if (!c.value.dtype().is_scalar() ||
+-              SideEffect(c.value) > CallEffectKind::kPure) {
+-            // A captured memory read is not a block-uniform parameter.
+-            varying_vars.insert(c.var);
+-            continue;
+-          }
+-          if (!is_uniform(c.value)) {
+-            varying_vars.insert(c.var);
+-          }
+-          proof.Bind(c.var, c.value);
+-        } else if (!c.var.same_as(tx_->var) && !c.var.same_as(ty_->var) &&
+-                   !c.var.same_as(tz_->var)) {
+-          // Conservatively keep loop/block iterators in the proof obligation.
+-          varying_vars.insert(c.var);
+-          c.Populate(proof);
+-        }
+-      }
+-      // Scalar arithmetic on uniform parameters is uniform across the group.
+-      // Thread-dependent predicates remain conclusions, never assumptions.
+-      for (const PrimExpr &predicate : predicates) {
+-        if (is_uniform(predicate)) {
+-          proof.EnterConstraint(predicate);
+-        }
+-      }
+-      for (const PrimExpr &predicate : predicates) {
+-        if (!proof.CanProve(predicate)) {
+-          return std::nullopt;
+-        }
+-      }
+-    }
+-    return thread_count;
++    return {barrier_id, thread_count};
+   }
+ 
+   /*!
+@@ -582,8 +446,8 @@ private:
+       IterVar(Range::FromMinExtent(0, 1), Var("ty"), IterVarType::kDataPar);
+   IterVar tz_ =
+       IterVar(Range::FromMinExtent(0, 1), Var("tz"), IterVarType::kDataPar);
+-  std::map<BarrierKey, size_t> barrier_ids_;
+-  SyncConstraintMap sync_constraints_;
++  std::unordered_map<ThreadBoundKey, size_t> barrier_id_map_;
++  std::unordered_map<ThreadBoundKey, size_t> thread_count_map_;
+   // Named-barrier ids already taken in this function, including those assigned
+   // by an earlier ThreadSync run for another storage scope.
+   std::unordered_set<size_t> used_barrier_ids_;
+@@ -2207,12 +2071,16 @@ private:
+   }
+ };
+ 
+-PrimFunc TileLangThreadSync(PrimFunc func,
+-                            const std::vector<StorageScope> &sync_scopes) {
+-  if (sync_scopes.empty()) {
++PrimFunc TileLangThreadSync(PrimFunc func, const std::string &storage_scope) {
++  StorageScope sync_scope = StorageScope::Create(storage_scope);
++  if (sync_scope.rank == StorageRank::kGlobal) {
+     return func;
+   }
+-  Stmt stmt = func->body;
++  auto *n = func.CopyOnWrite();
++  auto stmt = n->body;
++  if (sync_scope.rank == StorageRank::kShared && sync_scope.tag.empty()) {
++    stmt = ThreadSyncAfterWaitGroupInserter(sync_scope)(stmt);
++  }
+   // Get warp size from target, defaulting to 32 if not available
+   int warp_size = 32;
+   if (auto target = func->GetAttr<Target>(tvm::attr::kTarget)) {
+@@ -2221,23 +2089,14 @@ PrimFunc TileLangThreadSync(PrimFunc func,
+                     .value()
+                     .IntValue();
+   }
+-  for (const StorageScope &sync_scope : sync_scopes) {
+-    if (sync_scope.rank == StorageRank::kShared && sync_scope.tag.empty()) {
+-      stmt = ThreadSyncAfterWaitGroupInserter(sync_scope)(stmt);
+-    }
+-    TileLangThreadSyncPlanner planner(sync_scope, warp_size);
+-    for (const auto &[_, buffer] : func->buffer_map) {
+-      planner.SetBufferDataToBuffer(buffer->data, buffer);
+-    }
+-    planner(stmt);
+-    stmt = ThreadSyncInserter(sync_scope,
+-                              planner.syncs_inserted_)(std::move(stmt));
++  TileLangThreadSyncPlanner planner(sync_scope, warp_size);
++  for (const auto &[_, buffer] : func->buffer_map) {
++    planner.SetBufferDataToBuffer(buffer->data, buffer);
+   }
+-  // Assign partial-sync ids only after all scopes have been planned. The same
+-  // thread group can then reuse an id across scopes, while disjoint groups and
+-  // explicitly numbered barriers remain isolated.
+-  func.CopyOnWrite()->body =
+-      ThreadPartialSyncRewriter::Rewrite(std::move(stmt), warp_size);
++  planner(stmt);
++  stmt =
++      ThreadSyncInserter(sync_scope, planner.syncs_inserted_)(std::move(stmt));
++  n->body = ThreadPartialSyncRewriter::Rewrite(std::move(stmt), warp_size);
+   return func;
+ }
+ 
+@@ -2245,31 +2104,18 @@ using namespace tirx::transform;
+ 
+ namespace transform {
+ 
+-tvm::transform::Pass
+-ThreadSync(const ffi::Variant<String, Array<String>> &storage_scope) {
+-  Array<String> storage_scopes;
+-  if (auto scope = storage_scope.as<String>()) {
+-    storage_scopes.push_back(scope.value());
+-  } else {
+-    storage_scopes = storage_scope.get<Array<String>>();
+-  }
+-
+-  std::vector<StorageScope> sync_scopes;
+-  for (const String &scope : storage_scopes) {
+-    StorageScope sync_scope = StorageScope::Create(scope);
+-    if (sync_scope.rank != StorageRank::kGlobal) {
+-      sync_scopes.push_back(std::move(sync_scope));
+-    }
+-  }
+-  auto pass_func = [sync_scopes = std::move(sync_scopes)](
+-                       PrimFunc f, const IRModule &m, const PassContext &ctx) {
++tvm::transform::Pass ThreadSync(const String &storage_scope) {
++  auto pass_func = [storage_scope](PrimFunc f, const IRModule &m,
++                                   const PassContext &ctx) {
++    auto *n = f.CopyOnWrite();
+     // Check if thread storage sync is disabled
+     bool disable_syncthreads =
+         ctx->GetConfig(kDisableThreadStorageSync, Bool(false)).value()->value;
+     if (disable_syncthreads) {
+       return f;
+     }
+-    return tl::TileLangThreadSync(std::move(f), sync_scopes);
++    return tl::TileLangThreadSync(std::move(f), storage_scope);
++    ;
+   };
+   return CreatePrimFuncPass(pass_func, 0, "tl.ThreadSync", {});
+ }
+diff --git a/testing/python/transform/test_tilelang_transform_thread_sync.py b/testing/python/transform/test_tilelang_transform_thread_sync.py
+index 5c6c5bf0..4c0b1ff1 100644
+--- a/testing/python/transform/test_tilelang_transform_thread_sync.py
++++ b/testing/python/transform/test_tilelang_transform_thread_sync.py
+@@ -1104,11 +1104,11 @@ def test_partial_sync_warp_multiple_still_lowered():
+     assert not _storage_syncs(guard)
+ 
+ 
+-@pytest.mark.parametrize("combined_scopes, same_threads", [(False, False), (True, False), (True, True)])
+-def test_partial_sync_ids_across_storage_scopes(combined_scopes, same_threads):
+-    """Disjoint groups stay isolated, while joint planning reuses IDs for one group."""
+-    dynamic_begin = 0 if same_threads else 64
+-    dynamic_end = dynamic_begin + 64
++def test_partial_sync_ids_unique_across_storage_scopes():
++    """The pipeline runs ThreadSync once for "shared" and once for "shared.dyn".
++    Two disjoint thread ranges must not end up on the same named barrier: each
++    `bar.sync id, count` would then complete the other group's phases (seen as a
++    hang in the warp-specialised sparse-MLA forward kernel)."""
+ 
+     @T.prim_func(private=True)
+     def func():
+@@ -1123,17 +1123,14 @@ def test_partial_sync_ids_across_storage_scopes(combined_scopes, same_threads):
+             for i in range(2):
+                 S[tx] = T.float32(1)
+                 acc[0] += S[63 - tx]
+-        if dynamic_begin <= tx and tx < dynamic_end:
++        if tx >= 64:
+             for i in range(2):
+-                D[tx - dynamic_begin] = T.float32(1)
+-                acc[0] += D[dynamic_end - 1 - tx]
++                D[tx - 64] = T.float32(1)
++                acc[0] += D[127 - tx]
+ 
+     mod = tvm.IRModule({"main": func})
+-    if combined_scopes:
+-        mod = tilelang.transform.ThreadSync(["shared", "shared.dyn"])(mod)
+-    else:
+-        mod = tilelang.transform.ThreadSync("shared")(mod)
+-        mod = tilelang.transform.ThreadSync("shared.dyn")(mod)
++    mod = tilelang.transform.ThreadSync("shared")(mod)
++    mod = tilelang.transform.ThreadSync("shared.dyn")(mod)
+     lowered = mod["main"]
+     static_syncs = _storage_syncs(lowered, "shared", arg_count=3)
+     dynamic_syncs = _storage_syncs(lowered, "shared.dyn", arg_count=3)
+@@ -1141,177 +1138,7 @@ def test_partial_sync_ids_across_storage_scopes(combined_scopes, same_threads):
+     _assert_partial_sync_params(dynamic_syncs, 64)
+     static_ids = {int(call.args[1]) for call in static_syncs}
+     dynamic_ids = {int(call.args[1]) for call in dynamic_syncs}
+-    if same_threads:
+-        assert len(static_ids | dynamic_ids) == 1, "the same thread group needs only one named barrier"
+-    else:
+-        assert not static_ids & dynamic_ids, f"disjoint thread ranges share named barriers {static_ids & dynamic_ids}"
+-
+-
+-def test_partial_sync_combined_scopes_reserve_explicit_ids():
+-    """An explicit ID stays reserved even when it has the same participants."""
+-
+-    @T.prim_func(private=True)
+-    def func():
+-        S = T.alloc_buffer((64,), dtype="float32", scope="shared")
+-        D = T.alloc_buffer((64,), dtype="float32", scope="shared.dyn")
+-        acc = T.alloc_buffer((1,), dtype="float32", scope="local")
+-        bx = T.launch_thread("blockIdx.x", 1)
+-        tx = T.launch_thread("threadIdx.x", 96)
+-        ty = T.launch_thread("threadIdx.y", 1)
+-        tz = T.launch_thread("threadIdx.z", 1)
+-        if tx >= 32:
+-            T.evaluate(T.call_intrin("int32", "tirx.tvm_storage_sync", "shared", 3, 64))
+-            S[tx - 32] = T.float32(1)
+-            acc[0] = S[95 - tx]
+-            D[tx - 32] = acc[0]
+-            acc[0] = D[95 - tx]
+-
+-    mod = tilelang.transform.ThreadSync(("shared", "shared.dyn"))(tvm.IRModule({"main": func}))
+-    static_syncs = _storage_syncs(mod["main"], "shared", arg_count=3)
+-    dynamic_syncs = _storage_syncs(mod["main"], "shared.dyn", arg_count=3)
+-    _assert_partial_sync_params(static_syncs + dynamic_syncs, 64)
+-    assert sum(int(call.args[1]) == 3 for call in static_syncs) == 1
+-    generated_ids = {int(call.args[1]) for call in static_syncs if int(call.args[1]) != 3}
+-    assert len(generated_ids) == 1
+-    assert {int(call.args[1]) for call in dynamic_syncs} == generated_ids
+-
+-
+-@pytest.mark.parametrize("predicate_form", ["direct", "else", "bind"])
+-def test_partial_sync_distinct_sparse_groups_not_merged(predicate_form):
+-    """Equal bounds and counts do not identify groups with different middle warps."""
+-
+-    @T.prim_func(private=True)
+-    def func():
+-        S = T.alloc_buffer((160,), dtype="float32", scope="shared")
+-        D = T.alloc_buffer((160,), dtype="float32", scope="shared.dyn")
+-        acc = T.alloc_buffer((1,), dtype="float32", scope="local")
+-        bx = T.launch_thread("blockIdx.x", 1)
+-        tx = T.launch_thread("threadIdx.x", 192)
+-        ty = T.launch_thread("threadIdx.y", 1)
+-        tz = T.launch_thread("threadIdx.z", 1)
+-        # Warps {0, 2, 4} and {0, 3, 4} have the same bounding range and size.
+-        if tx < 160 and tx // 32 % 2 == 0:
+-            for i in range(2):
+-                S[tx] = T.float32(1)
+-                acc[0] = S[tx ^ 1]
+-        if tx < 160 and (tx < 32 or tx >= 96):
+-            for i in range(2):
+-                D[tx] = T.float32(1)
+-                acc[0] = D[tx ^ 1]
+-
+-    tx = _thread_var(func)
+-
+-    def rewrite_guard(node):
+-        if not isinstance(node, tirx.IfThenElse):
+-            return None
+-        if predicate_form == "else":
+-            return tirx.IfThenElse(tirx.Not(node.condition), tirx.Evaluate(0), node.then_case)
+-        if predicate_form == "bind":
+-            condition = tirx.Var("condition", "bool")
+-            alias = tirx.Var("alias", "bool")
+-            body = tirx.SeqStmt(
+-                [tirx.Bind(condition, node.condition), tirx.Bind(alias, condition), tirx.IfThenElse(alias, node.then_case, None)]
+-            )
+-            # Keep the bounding range explicit: this case checks whether the
+-            # density proof follows aliases for the holes inside that range.
+-            return tirx.IfThenElse(tx < 160, body, None)
+-        return None
+-
+-    func = func.with_body(tirx.stmt_functor.ir_transform(func.body, None, rewrite_guard, ["tirx.IfThenElse"]))
+-    mod = tilelang.transform.ThreadSync(["shared", "shared.dyn"])(tvm.IRModule({"main": func}))
+-    static_syncs = _storage_syncs(mod["main"], "shared", arg_count=3)
+-    dynamic_syncs = _storage_syncs(mod["main"], "shared.dyn", arg_count=3)
+-    _assert_partial_sync_params(static_syncs + dynamic_syncs, 96)
+-    static_ids = {int(call.args[1]) for call in static_syncs}
+-    dynamic_ids = {int(call.args[1]) for call in dynamic_syncs}
+-    assert len(static_ids) == len(dynamic_ids) == 1
+-    assert static_ids.isdisjoint(dynamic_ids)
+-
+-
+-@pytest.mark.parametrize(
+-    "condition_source",
+-    ["parameter", "load", pytest.param("warp_idx", marks=tilelang.testing.requires_cuda.marks())],
+-)
+-def test_partial_sync_dense_proof_requires_uniform_bind(condition_source):
+-    """Neither memory reads nor pure thread intrinsics imply uniform values."""
+-
+-    def bind_value(flag, gate):
+-        if condition_source == "load":
+-            return gate[0]
+-        if condition_source == "warp_idx":
+-            return tirx.call_intrin("int32", tirx.op.Op.get("tl.get_warp_idx"))
+-        return flag
+-
+-    @T.prim_func(private=True)
+-    def func(flag: T.int32, gate: T.Buffer((1,), "int32")):
+-        bx = T.launch_thread("blockIdx.x", 1)
+-        tx = T.launch_thread("threadIdx.x", 96)
+-        ty = T.launch_thread("threadIdx.y", 1)
+-        tz = T.launch_thread("threadIdx.z", 1)
+-        value = bind_value(flag, gate)
+-        condition: T.bool = value > 0
+-        if condition:
+-            if tx < 32:
+-                T.evaluate(0)
+-            else:
+-                T.tvm_storage_sync("shared")
+-                T.tvm_storage_sync("shared.dyn")
+-
+-    mod = tilelang.transform.ThreadSync(["shared", "shared.dyn"])(tvm.IRModule({"main": func}))
+-    syncs = _storage_syncs(mod["main"], "shared", arg_count=3)
+-    syncs += _storage_syncs(mod["main"], "shared.dyn", arg_count=3)
+-    _assert_partial_sync_params(syncs, 64)
+-    assert len(syncs) == 2
+-    assert len({int(call.args[1]) for call in syncs}) == (1 if condition_source == "parameter" else 2)
+-
+-
+-def test_partial_sync_unproven_groups_with_different_counts_stay_isolated():
+-    """An unknown dense group and a sparse group can have identical bounds."""
+-
+-    @T.prim_func(private=True)
+-    def func(gate: T.Buffer((1,), "int32")):
+-        bx = T.launch_thread("blockIdx.x", 1)
+-        tx = T.launch_thread("threadIdx.x", 128)
+-        ty = T.launch_thread("threadIdx.y", 1)
+-        tz = T.launch_thread("threadIdx.z", 1)
+-        for i in range(2):
+-            if gate[0] > 0:
+-                if tx < 96:
+-                    T.tvm_storage_sync("shared")
+-            if tx < 96 and tx // 32 != 1:
+-                T.tvm_storage_sync("shared")
+-
+-    mod = tilelang.transform.ThreadSync(["shared", "shared.dyn"])(tvm.IRModule({"main": func}))
+-    syncs = _storage_syncs(mod["main"], "shared", arg_count=3)
+-    assert {int(call.args[2]) for call in syncs} == {64, 96}
+-    assert len({int(call.args[1]) for call in syncs}) == 2, "different participant counts share a barrier"
+-
+-
+-@tilelang.testing.requires_cuda
+-def test_partial_sync_pipeline_reuses_id_after_async_wait():
+-    """Async waits and buffer-reuse hazards in one thread group share a barrier."""
+-    from tilelang import language as TL
+-
+-    @TL.prim_func
+-    def kernel(A: TL.Tensor((4, 128), "float32"), B: TL.Tensor((4, 128), "float32")):
+-        with TL.Kernel(1, threads=96):
+-            tx = TL.get_thread_binding()
+-            if tx >= 32:
+-                shared = TL.alloc_shared((128,), "float32")
+-                for i in TL.Pipelined(4, num_stages=2):
+-                    TL.copy(A[i, 0], shared, disable_tma=True)
+-                    for j in TL.Parallel(128):
+-                        B[i, j] = shared[(j + 64) % 128]
+-
+-    target = tvm.target.Target({"kind": "cuda", "arch": "sm_80"})
+-    with target:
+-        lowered = tilelang.lower(kernel, target=target)
+-    syncs = _storage_syncs(lowered.device_mod, "shared", arg_count=3)
+-    syncs += _storage_syncs(lowered.device_mod, "shared.dyn", arg_count=3)
+-    _assert_partial_sync_params(syncs, 64)
+-    assert collect_calls(lowered.device_mod, op="tirx.ptx_wait_group"), "expected a cp.async pipeline"
+-    assert len(syncs) > 1
+-    assert len({int(call.args[1]) for call in syncs}) == 1, "the pipeline unnecessarily splits one thread group's barriers"
++    assert not static_ids & dynamic_ids, f"disjoint thread ranges share named barriers {static_ids & dynamic_ids}"
+ 
+ 
+ # =============================================================================
+diff --git a/tilelang/cuda/pipeline.py b/tilelang/cuda/pipeline.py
+index 4f6f7b92..85f2e490 100644
+--- a/tilelang/cuda/pipeline.py
++++ b/tilelang/cuda/pipeline.py
+@@ -255,7 +255,8 @@ def CUDAPassPipelineBody(mod: IRModule, target: Target) -> IRModule:
+     # programming model; the pass itself checks the PrimFunc's target.
+     mod = tilelang.cuda.transform.InjectFenceProxy()(mod)
+ 
+-    mod = tilelang.transform.ThreadSync(["shared", "shared.dyn"])(mod)
++    mod = tilelang.transform.ThreadSync("shared")(mod)
++    mod = tilelang.transform.ThreadSync("shared.dyn")(mod)
+ 
+     # @CUDA-specific
+     # Inject conservative tcgen05 fences on Blackwell (SM100+).
+diff --git a/tilelang/transform/__init__.py b/tilelang/transform/__init__.py
+index 56cf028e..3db92f88 100644
+--- a/tilelang/transform/__init__.py
++++ b/tilelang/transform/__init__.py
+@@ -105,16 +105,13 @@ def VerifyBufferInit():
+     return _ffi_api.VerifyBufferInit()  # type: ignore
+ 
+ 
+-def ThreadSync(storage_scope: str | list[str] | tuple[str, ...]):
++def ThreadSync(storage_scope: str):
+     """Insert sync between parallel read/write of shared buffers.
+ 
+     Parameters
+     ----------
+-    storage_scope: str or sequence of str
+-        The target storage scope, or scopes to process in order. When several
+-        scopes are supplied, partial-sync barrier IDs are assigned after all
+-        scopes have been processed, allowing the same thread group to reuse an
+-        ID across scopes.
++    storage_scope: str
++        The target storage scope.
+ 
+     Returns
+     -------

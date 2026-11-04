@@ -1,0 +1,40 @@
+{
+  "host": "sp8",
+  "independent_sp8_authorized": true,
+  "jobs": [
+    {
+      "label": "base-a",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/language/test_tilelang_language_mxf8f6f4_mma_block_scale.py",
+        "/review/variants/base/testing/python/language/test_tilelang_language_mxfp4_mma_block_scale.py",
+        "/review/variants/base/testing/python/language/test_tilelang_language_nvf4_mma_block_scale.py",
+        "/review/variants/base/testing/python/tools/test_tilelang_tools_cuda_iket.py"
+      ]
+    },
+    {
+      "label": "base-b",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/language/test_tilelang_language_mxf8f6f4_mma_block_scale.py",
+        "/review/variants/base/testing/python/language/test_tilelang_language_mxfp4_mma_block_scale.py",
+        "/review/variants/base/testing/python/language/test_tilelang_language_nvf4_mma_block_scale.py",
+        "/review/variants/base/testing/python/tools/test_tilelang_tools_cuda_iket.py"
+      ]
+    }
+  ]
+}
