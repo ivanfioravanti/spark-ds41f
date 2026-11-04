@@ -171,5 +171,8 @@
       "timeout_seconds": 180
     }
   ],
-  "wait_for_window": true
+  "wait_for_window": true,
+  "wait_for_pending_requests": false,
+  "ignore_preexisting_request": true,
+  "request_policy": "The prior holder released its window. After several minutes with no hold, preserve the old request file and finish the short batch; yield to any new or changed request. An existing hold or GPU process still forbids launch."
 }

@@ -38,11 +38,12 @@ def main():
     started_waiting = time.monotonic()
     waiting_reported = False
     request = Path.home() / "spark-request.json"
+    prior_request = (request.read_bytes(), request.stat().st_mtime_ns) if request.exists() else None
     while True:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             foreign_request = request.exists() and json.loads(request.read_text()).get("who") != HOLDER
-            if not hold.exists() and not foreign_request:
+            if not hold.exists() and (not foreign_request or not specification.get("wait_for_pending_requests", True)):
                 break
             fcntl.flock(lock, fcntl.LOCK_UN)
         except BlockingIOError:
@@ -87,7 +88,8 @@ def main():
         ).strip()
         for job in specification["jobs"]:
             request = Path.home() / "spark-request.json"
-            if request.exists():
+            same_prior_request = (request.read_bytes(), request.stat().st_mtime_ns) == prior_request if request.exists() else False
+            if request.exists() and not (specification.get("ignore_preexisting_request") and same_prior_request):
                 print("YIELD requested after the previous job: " + request.read_text(), flush=True)
                 break
             label = job["label"]
