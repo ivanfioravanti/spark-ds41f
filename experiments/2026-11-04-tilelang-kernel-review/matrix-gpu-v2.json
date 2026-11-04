@@ -1,0 +1,745 @@
+{
+  "host": "sp8",
+  "independent_sp8_authorized": true,
+  "jobs": [
+    {
+      "label": "strict-pr3190-a-v2",
+      "source": "variants/pr3190",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py::test_real_eager_compile_then_execute"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3710-a-v2",
+      "source": "variants/pr3710-v2",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3190-a-v2",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-strict-pr3190-a-v2",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare",
+        "--strict-prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_if_with_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_read_thread_id_independent_location",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_let_stmt",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared_dyn_stmatrix_loop_hoist",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_no_dependency_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_with_cross_thread_dependency",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[False]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[True]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_modulo_buffering",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_different_indices",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_non_uniform_if_with_threadidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_blockidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_runtime_block_uniform_condition",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_nested_non_uniform_if",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_needed_uniform_accesses",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_cross_thread_waw_with_shifted_partition_requires_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_provably_disjoint_waw_partitions_need_no_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[6]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[64]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_bind_definition_uses_per_thread_instances",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_non_warp_multiple_rejected",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_warp_multiple_still_lowered",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_dense_proof_requires_uniform_bind[warp_idx]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_pipeline_reuses_id_after_async_wait",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_unbounded_atomic_touched_range_stays_conservative",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_grid_acts_as_shared_barrier",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_address_of_extern_write_is_fenced_before_block_reads",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_access_ptr_write_is_fenced_before_block_reads"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-without-3761-a-v2",
+      "source": "variants/without-3761",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_if_with_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_read_thread_id_independent_location",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_let_stmt",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared_dyn_stmatrix_loop_hoist",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_no_dependency_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_with_cross_thread_dependency",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[False]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[True]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_modulo_buffering",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_different_indices",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_non_uniform_if_with_threadidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_blockidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_runtime_block_uniform_condition",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_nested_non_uniform_if",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_needed_uniform_accesses",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_cross_thread_waw_with_shifted_partition_requires_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_provably_disjoint_waw_partitions_need_no_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[6]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[64]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_bind_definition_uses_per_thread_instances",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_non_warp_multiple_rejected",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_warp_multiple_still_lowered",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_dense_proof_requires_uniform_bind[warp_idx]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_pipeline_reuses_id_after_async_wait",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_unbounded_atomic_touched_range_stays_conservative",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_grid_acts_as_shared_barrier",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_address_of_extern_write_is_fenced_before_block_reads",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_access_ptr_write_is_fenced_before_block_reads"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-pr3690-a-v2",
+      "source": "variants/pr3690",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-pr3661-a-v2",
+      "source": "variants/pr3661",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-pr3537-a-v2",
+      "source": "variants/pr3537",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-without-3715-a-v2",
+      "source": "variants/without-3715",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "clamp-pr3605-a-v2",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prefetch-pr3490-a-v2",
+      "source": "variants/pr3490",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prefetch"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "redux-base-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "redux"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmatrue-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmafalse-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmatrue-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmafalse-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmatrue-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmafalse-a-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "strict-pr3190-b-v2",
+      "source": "variants/pr3190",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py::test_real_eager_compile_then_execute"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3710-b-v2",
+      "source": "variants/pr3710-v2",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3190-b-v2",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-strict-pr3190-b-v2",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare",
+        "--strict-prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_if_with_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_read_thread_id_independent_location",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_let_stmt",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared_dyn_stmatrix_loop_hoist",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_no_dependency_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_with_cross_thread_dependency",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[False]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[True]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_modulo_buffering",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_different_indices",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_non_uniform_if_with_threadidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_blockidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_runtime_block_uniform_condition",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_nested_non_uniform_if",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_needed_uniform_accesses",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_cross_thread_waw_with_shifted_partition_requires_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_provably_disjoint_waw_partitions_need_no_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[6]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[64]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_bind_definition_uses_per_thread_instances",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_non_warp_multiple_rejected",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_warp_multiple_still_lowered",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_dense_proof_requires_uniform_bind[warp_idx]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_pipeline_reuses_id_after_async_wait",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_unbounded_atomic_touched_range_stays_conservative",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_grid_acts_as_shared_barrier",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_address_of_extern_write_is_fenced_before_block_reads",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_access_ptr_write_is_fenced_before_block_reads"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-without-3761-b-v2",
+      "source": "variants/without-3761",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_if_with_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_read_thread_id_independent_location",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_let_stmt",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_shared_dyn_stmatrix_loop_hoist",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_no_dependency_same_index",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_with_cross_thread_dependency",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[False-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-default_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-non_unit_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nonzero_start]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-nondivisible_extent]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-single_iteration]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_respects_loop_step[True-extent_smaller_than_step]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[False]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_non_unit_step_last_pair[True]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_modulo_buffering",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_loop_carry_different_indices",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_non_uniform_if_with_threadidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_blockidx",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_inside_uniform_if_runtime_block_uniform_condition",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_hoist_nested_non_uniform_if",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_needed_uniform_accesses",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_cross_thread_waw_with_shifted_partition_requires_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_provably_disjoint_waw_partitions_need_no_sync",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[6]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_private_waw_needs_no_sync[64]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_bind_definition_uses_per_thread_instances",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_non_warp_multiple_rejected",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_warp_multiple_still_lowered",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_dense_proof_requires_uniform_bind[warp_idx]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_partial_sync_pipeline_reuses_id_after_async_wait",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_unbounded_atomic_touched_range_stays_conservative",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_sync_grid_acts_as_shared_barrier",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[0-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-y]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_waw_uses_all_thread_axes[1-z]",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_address_of_extern_write_is_fenced_before_block_reads",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_access_ptr_write_is_fenced_before_block_reads"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-pr3690-b-v2",
+      "source": "variants/pr3690",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-pr3661-b-v2",
+      "source": "variants/pr3661",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-pr3537-b-v2",
+      "source": "variants/pr3537",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-without-3715-b-v2",
+      "source": "variants/without-3715",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "clamp-pr3605-b-v2",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prefetch-pr3490-b-v2",
+      "source": "variants/pr3490",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prefetch"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "redux-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "redux"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmatrue-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmafalse-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmatrue-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmafalse-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmatrue-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmafalse-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    }
+  ],
+  "wait_for_window": true
+}

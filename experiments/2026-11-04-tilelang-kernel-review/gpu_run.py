@@ -34,10 +34,23 @@ def main():
     if specification.get("host") != "sp8" or not specification.get("independent_sp8_authorized"):
         raise SystemExit("an explicit sp8-only authorization is required")
     lock = open("/tmp/spark-lab-gpu.lock", "w")
-    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     hold = Path.home() / "spark-hold.json"
-    if hold.exists():
-        raise SystemExit("sp8 has an existing hold: " + hold.read_text())
+    started_waiting = time.monotonic()
+    waiting_reported = False
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if not hold.exists():
+                break
+            fcntl.flock(lock, fcntl.LOCK_UN)
+        except BlockingIOError:
+            pass
+        if not specification.get("wait_for_window") or time.monotonic() - started_waiting > 1800:
+            raise SystemExit("sp8 has an existing reservation; no GPU job launched")
+        if not waiting_reported:
+            print("WAIT for sp8's existing reservation; no GPU job launched", flush=True)
+            waiting_reported = True
+        time.sleep(5)
     request = Path.home() / "spark-request.json"
     if request.exists() and json.loads(request.read_text()).get("who") == HOLDER:
         request.unlink()
