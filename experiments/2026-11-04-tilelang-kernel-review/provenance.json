@@ -1,0 +1,63 @@
+{
+  "base_repository_commit": "e33d1e0223b7346b821a9201d5c67c3745c0151a",
+  "toolchain_image": "sha256:213ba4df68d06665add7a26260c2321d55854a75b8a51ae71c72d0b97eac814b",
+  "native_base_build": {
+    "script_commit": "e87f2f9b69eaefe6fc408e9c877ec748b79c840d",
+    "log": "build-base.log",
+    "min_host_available_gib": 108.47523880004883
+  },
+  "native_variants": {
+    "script_commit": "48702ab71bd98aeadd62d1083a45b1b6844bab0c",
+    "log": "build-variants.log"
+  },
+  "batches": [
+    {
+      "name": "base-gpu",
+      "harness_commit": "e87f2f9b69eaefe6fc408e9c877ec748b79c840d",
+      "valid": true
+    },
+    {
+      "name": "matrix-cpu",
+      "harness_commit": "450d1d01029b4d38f931899508d0a9df22b9ab21",
+      "valid": false,
+      "reason": "pytest source precedence"
+    },
+    {
+      "name": "matrix-cpu-v2",
+      "harness_commit": "4794cdc1c12d17ee12317dbf35ae00a801d768b7",
+      "valid": false,
+      "reason": "environment identity guard"
+    },
+    {
+      "name": "matrix-cpu-v3",
+      "harness_commit": "36b557b581a6e5c850594b45eb4a82ff824eed6d",
+      "valid": true
+    },
+    {
+      "name": "matrix-gpu",
+      "harness_commit": "1bd012aaf19bcdf91f15ba797a070310960f05aa",
+      "valid": false,
+      "reason": "busy local lock; zero GPU launches"
+    },
+    {
+      "name": "matrix-gpu-v2",
+      "harness_commit": "777b3ce3b9478af5ea888acfbe3e996ceff4cad2",
+      "valid": true,
+      "ended": "yielded at a job boundary to another sp8 request"
+    },
+    {
+      "name": "matrix-gpu-resume",
+      "harness_commit": "1bdc00eb3852f7549aaa2533472a502efc343397",
+      "valid": true,
+      "status": "queued at time of writing"
+    }
+  ],
+  "scale_selector_regressions": {
+    "cases": 4,
+    "passes_per_case": 2,
+    "failures": 0
+  },
+  "serving_operations": [],
+  "dgx_hold_modified": false,
+  "authorization": "Owner: Yes, use sp8 independently; leaves foreign DGX hold untouched."
+}

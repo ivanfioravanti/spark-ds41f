@@ -1,0 +1,75 @@
+{
+  "base": "b26f48b85790b832993f2c9d240dc3c39d6075e8",
+  "checks": [
+    {
+      "name": "3661",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3661.diff",
+      "expected": "710925bbde5faa60a8af1422621bffb02919551b",
+      "actual": "710925bbde5faa60a8af1422621bffb02919551b",
+      "passed": true
+    },
+    {
+      "name": "3605",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3605.diff",
+      "expected": "5dfad56a436635203e7aff4959bc4a934ec9a206",
+      "actual": "5dfad56a436635203e7aff4959bc4a934ec9a206",
+      "passed": true
+    },
+    {
+      "name": "3690",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3690.diff",
+      "expected": "e9a38e6d7c7cb40db6f219b266288e03e6e3ad70",
+      "actual": "e9a38e6d7c7cb40db6f219b266288e03e6e3ad70",
+      "passed": true
+    },
+    {
+      "name": "3710",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3710.diff",
+      "expected": "1fe7e7955686439282edb5579d3805f093ee69bf",
+      "actual": "1fe7e7955686439282edb5579d3805f093ee69bf",
+      "passed": true
+    },
+    {
+      "name": "3190",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3190.diff",
+      "expected": "272041e3e6a2748460d31749c0938d7c6a160e60",
+      "actual": "272041e3e6a2748460d31749c0938d7c6a160e60",
+      "passed": true
+    },
+    {
+      "name": "3537",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3537.diff",
+      "expected": "93d54ec9d049abe77cb7d0de3b9ebc1f98ca9951",
+      "actual": "93d54ec9d049abe77cb7d0de3b9ebc1f98ca9951",
+      "passed": true
+    },
+    {
+      "name": "3568",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3568.diff",
+      "expected": "d3f87002969889c367e95804b1ff71dff7f11619",
+      "actual": "d3f87002969889c367e95804b1ff71dff7f11619",
+      "passed": true
+    },
+    {
+      "name": "3490",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3490.diff",
+      "expected": "2d10e327c6efdea11afaf7316e23d588cc04e648",
+      "actual": "2d10e327c6efdea11afaf7316e23d588cc04e648",
+      "passed": true
+    },
+    {
+      "name": "without-3715",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/without-3715.diff",
+      "expected": "c38667950c19ad900cf557ccbd901beb4adb2d72",
+      "actual": "c38667950c19ad900cf557ccbd901beb4adb2d72",
+      "passed": true
+    },
+    {
+      "name": "without-3761",
+      "patch": "experiments/2026-11-04-tilelang-kernel-review/ported/without-3761.diff",
+      "expected": "da2a6c084dd9b1ce413ed9323357fe225bf7d67f",
+      "actual": "da2a6c084dd9b1ce413ed9323357fe225bf7d67f",
+      "passed": true
+    }
+  ]
+}
