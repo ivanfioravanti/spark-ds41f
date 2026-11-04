@@ -69,6 +69,10 @@ def main():
             ["docker", "image", "inspect", "sha256:213ba4df68d0", "--format", "{{.Id}}"], text=True
         ).strip()
         for job in specification["jobs"]:
+            request = Path.home() / "spark-request.json"
+            if request.exists():
+                print("YIELD requested after the previous job: " + request.read_text(), flush=True)
+                break
             label = job["label"]
             output = BASE / "runs" / label
             output.mkdir(parents=True, exist_ok=False)
@@ -90,7 +94,7 @@ def main():
                 "--env", f"PYTHONPATH=/review/{source}", "--env", "PYTHONDONTWRITEBYTECODE=1",
                 "--env", "TILELANG_CACHE_DIR=/cache/tilelang", "--env", "CUDA_CACHE_PATH=/cache/driver",
                 "--env", "VLLM_PLUGINS=", "--env", "NO_GIT_VERSION=1", "--workdir", "/out",
-                "--entrypoint", "/usr/bin/timeout", image, "1800", "python3", *job["args"],
+                "--entrypoint", "/usr/bin/timeout", image, str(job.get("timeout_seconds", 300)), "python3", *job["args"],
             ]
             receipt = {
                 "label": label, "started_utc": now(), "image": image, "source": source, "command": command,

@@ -1,0 +1,676 @@
+{
+  "host": "sp8",
+  "independent_sp8_authorized": true,
+  "jobs": [
+    {
+      "label": "cache-base-a",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cache-pr3710-a",
+      "source": "variants/pr3710",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "strict-pr3190-a",
+      "source": "variants/pr3190",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_compile_phase.py",
+        "/review/variants/pr3190/testing/python/autotune/test_tilelang_autotune_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-base-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3710-a",
+      "source": "variants/pr3710",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3190-a",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-strict-pr3190-a",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare",
+        "--strict-prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "async-base-a",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "async-pr3568-a",
+      "source": "variants/pr3568",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-base-a",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-without-3761-a",
+      "source": "variants/without-3761",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-base-a",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-pr3690-a",
+      "source": "variants/pr3690",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-base-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-pr3661-a",
+      "source": "variants/pr3661",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-base-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-pr3537-a",
+      "source": "variants/pr3537",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-without-3715-a",
+      "source": "variants/without-3715",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-base-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "clamp-pr3605-a",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prefetch-pr3490-a",
+      "source": "variants/pr3490",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prefetch"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "redux-base-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "redux"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmatrue-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmafalse-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmatrue-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmafalse-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmatrue-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmafalse-a",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cache-base-b",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cache-pr3710-b",
+      "source": "variants/pr3710",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "strict-pr3190-b",
+      "source": "variants/pr3190",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_compile_phase.py",
+        "/review/variants/pr3190/testing/python/autotune/test_tilelang_autotune_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-base-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3710-b",
+      "source": "variants/pr3710",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-pr3190-b",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prepare-strict-pr3190-b",
+      "source": "variants/pr3190",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prepare",
+        "--strict-prepare"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "async-base-b",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "async-pr3568-b",
+      "source": "variants/pr3568",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-base-b",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "barriers-without-3761-b",
+      "source": "variants/without-3761",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-base-b",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "alignment-pr3690-b",
+      "source": "variants/pr3690",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3690/testing/python/components/test_cuda_shared_memory_alias_codegen.py",
+        "/review/variants/pr3690/testing/python/transform/test_tilelang_transform_smem_swizzle_alignment.py",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_and_raw_descriptor_share_allocation",
+        "/review/variants/pr3690/testing/python/language/test_tilelang_language_tma_copy.py::test_bulk_only_retains_small_arena_alignment"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-base-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-pr3661-b",
+      "source": "variants/pr3661",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-base-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-pr3537-b",
+      "source": "variants/pr3537",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-without-3715-b",
+      "source": "variants/without-3715",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-base-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "clamp-pr3605-b",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prefetch-pr3490-b",
+      "source": "variants/pr3490",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prefetch"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "redux-base-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "redux"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmatrue-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmafalse-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmatrue-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmafalse-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmatrue-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmafalse-b",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    }
+  ]
+}
