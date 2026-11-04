@@ -13,7 +13,6 @@
         "-p",
         "no:cacheprovider",
         "--junitxml=/out/junit.xml",
-        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
         "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py::test_real_eager_compile_then_execute"
       ],
       "timeout_seconds": 300
@@ -66,7 +65,6 @@
         "-p",
         "no:cacheprovider",
         "--junitxml=/out/junit.xml",
-        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
@@ -131,7 +129,6 @@
         "-p",
         "no:cacheprovider",
         "--junitxml=/out/junit.xml",
-        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
@@ -382,7 +379,6 @@
         "-p",
         "no:cacheprovider",
         "--junitxml=/out/junit.xml",
-        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
         "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py::test_real_eager_compile_then_execute"
       ],
       "timeout_seconds": 300
@@ -435,7 +431,6 @@
         "-p",
         "no:cacheprovider",
         "--junitxml=/out/junit.xml",
-        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
@@ -500,7 +495,6 @@
         "-p",
         "no:cacheprovider",
         "--junitxml=/out/junit.xml",
-        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_no_sync_between_atomic_adds_to_shared",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_shared_dyn_alias_different_element_sizes",
         "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py::test_thread_sync_handles_int64_tvm_access_ptr_offset",
