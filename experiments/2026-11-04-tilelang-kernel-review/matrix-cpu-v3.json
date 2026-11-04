@@ -1,0 +1,232 @@
+{
+  "jobs": [
+    {
+      "label": "cpu-cache-base-a-v3",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-cache-pr3710-a-v3",
+      "source": "variants/pr3710-v2",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-strict-pr3190-a-v3",
+      "source": "variants/pr3190",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_compile_phase.py",
+        "/review/variants/pr3190/testing/python/autotune/test_tilelang_autotune_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py",
+        "-k",
+        "not test_real_eager_compile_then_execute"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-async-base-a-v3",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-async-pr3568-a-v3",
+      "source": "variants/pr3568",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-barriers-base-a-v3",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-barriers-without-3761-a-v3",
+      "source": "variants/without-3761",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-cache-base-b-v3",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-cache-pr3710-b-v3",
+      "source": "variants/pr3710-v2",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3710/testing/python/cache/test_tilelang_without_kernel_cache.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-strict-pr3190-b-v3",
+      "source": "variants/pr3190",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_compile_phase.py",
+        "/review/variants/pr3190/testing/python/autotune/test_tilelang_autotune_explicit_compile.py",
+        "/review/variants/pr3190/testing/python/jit/test_tilelang_jit_tvm_ffi_executable.py",
+        "-k",
+        "not test_real_eager_compile_then_execute"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-async-base-b-v3",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-async-pr3568-b-v3",
+      "source": "variants/pr3568",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/pr3568/testing/python/transform/test_tilelang_transform_Inject_software_pipeline.py",
+        "-k",
+        "async_pipeline_drains_async_copy_consumed_in_its_own_stage or async_pipeline_epilogue_waits_follow_consumer_stage_distance"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-barriers-base-b-v3",
+      "source": "variants/base",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "cpu-barriers-without-3761-b-v3",
+      "source": "variants/without-3761",
+      "args": [
+        "-m",
+        "pytest",
+        "-q",
+        "-rA",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=/out/junit.xml",
+        "/review/variants/base/testing/python/transform/test_tilelang_transform_thread_sync.py"
+      ],
+      "timeout_seconds": 300
+    }
+  ]
+}

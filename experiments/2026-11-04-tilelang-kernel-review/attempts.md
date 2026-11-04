@@ -12,6 +12,9 @@ The first CPU matrix allowed pytest's reproducer directory to precede the
 selected compiler on Python's search path. Cross-variant comparisons from
 `cpu-*-a` / `cpu-*-b` are invalid. The rerun imports and asserts the requested
 compiler before pytest starts, recording its module path and library hashes.
+The v2 CPU pass stopped at the identity guard because TileLang prepends TVM to
+`PYTHONPATH` during import. The v3 guard captures the requested path before
+import, then checks the loaded module against it. No v2 test body ran.
 
 The first port of #3710 omitted the `is_cache_enabled` import. This is a porting
 error, not an upstream result. Its diff and failing receipts are preserved.

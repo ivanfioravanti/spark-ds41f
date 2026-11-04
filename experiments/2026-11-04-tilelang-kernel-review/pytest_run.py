@@ -5,9 +5,10 @@ import json
 import os
 import sys
 
+source = Path(os.environ["PYTHONPATH"]).resolve()
+
 import tilelang
 
-source = Path(os.environ["PYTHONPATH"]).resolve()
 module = Path(tilelang.__file__).resolve()
 assert module.is_relative_to(source), (module, source)
 identity = {"tilelang_module": str(module), "native_libraries": json.loads((source / "native-libraries.json").read_text())}
