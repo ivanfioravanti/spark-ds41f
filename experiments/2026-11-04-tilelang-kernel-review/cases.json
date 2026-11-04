@@ -69,10 +69,16 @@
     ],
     "apply_output": "Applied patch to 'testing/python/cache/test_tilelang_without_kernel_cache.py' cleanly.\nApplied patch to 'tilelang/jit/__init__.py' with conflicts.\nApplied patch to 'tilelang/testing/__init__.py' cleanly.\nU tilelang/jit/__init__.py\n",
     "ported_patch": "experiments/2026-11-04-tilelang-kernel-review/ported/pr-3710.diff",
-    "ported_sha256": "b6c2ac701693d3cf3936c036e4d42d421b4966c6fd54eef56816c50d4e0a5c47",
-    "ported_tree": "580ca722e799581f72c38b7af7b089e9c89edfe5",
+    "ported_sha256": "65584029b3b83fd7b02e0bf0c74a70b218931e4b36c22096a3c903b992ce0ebb",
+    "ported_tree": "1fe7e7955686439282edb5579d3805f093ee69bf",
     "port_status": "applied; validation pending",
-    "port_notes": "Retained local prepare/freeze, named errors and current JIT/autotuner behavior while resolving overlapping code."
+    "port_notes": "Retained local prepare/freeze, named errors and current JIT/autotuner behavior while resolving overlapping code.",
+    "first_attempt": {
+      "ported_tree": "580ca722e799581f72c38b7af7b089e9c89edfe5",
+      "ported_sha256": "b6c2ac701693d3cf3936c036e4d42d421b4966c6fd54eef56816c50d4e0a5c47",
+      "error": "Port omitted is_cache_enabled import; preserved pr-3710-attempt1.diff and initial CPU receipts."
+    },
+    "variant": "pr3710-v2"
   },
   {
     "number": 3190,

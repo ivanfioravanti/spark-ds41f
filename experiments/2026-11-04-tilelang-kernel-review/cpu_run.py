@@ -21,13 +21,16 @@ def main():
         label = job["label"]
         output = BASE / "runs" / label
         output.mkdir(parents=True, exist_ok=False)
+        arguments = job["args"]
+        if arguments[:2] == ["-m", "pytest"]:
+            arguments = [str(Path("/review/deployment/experiments/2026-11-04-tilelang-kernel-review/pytest_run.py")), *arguments[2:]]
         command = ["docker", "exec", "--workdir", "/review/runs/" + label,
                    "--env", "PYTHONPATH=/review/" + job["source"],
                    "--env", "PYTHONDONTWRITEBYTECODE=1", "--env", "NO_GIT_VERSION=1",
                    "--env", "TILELANG_CACHE_DIR=/review/cache/" + label,
                    "--env", "LD_LIBRARY_PATH=/review/cpu-stubs:/usr/local/cuda/lib64",
                    "tilelang-review-build-20261104", "/usr/bin/timeout", "180", "python3",
-                   *[a.replace("/out/", "/review/runs/" + label + "/") for a in job["args"]]]
+                   *[a.replace("/out/", "/review/runs/" + label + "/") for a in arguments]]
         receipt = {"label": label, "source": job["source"], "command": command,
                    "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                    "gpu_devices": [], "driver": "CUDA link stub, CPU checks only"}

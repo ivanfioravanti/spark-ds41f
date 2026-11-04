@@ -68,10 +68,18 @@ index 61036b86..c187d9d5 100644
  if __name__ == "__main__":
      tilelang.testing.main()
 diff --git a/tilelang/jit/__init__.py b/tilelang/jit/__init__.py
-index 3de1b525..08fb815f 100644
+index 3de1b525..a809a996 100644
 --- a/tilelang/jit/__init__.py
 +++ b/tilelang/jit/__init__.py
-@@ -567,14 +567,19 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+@@ -28,6 +28,7 @@ from contextlib import nullcontext
+ 
+ from tilelang.jit.kernel import JITKernel
+ from tilelang.cache import KernelNotPreparedError, cached
++from tilelang.env import is_cache_enabled
+ from tilelang.utils.device import get_available_cpu_count
+ from os import path, makedirs
+ from logging import getLogger
+@@ -567,14 +568,19 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
              self.mode = self._infer_jit_mode(*args, **kwargs)
              self.func.set_mode(self.mode)
  
@@ -93,7 +101,7 @@ index 3de1b525..08fb815f 100644
          if kernel is None:
              try:
                  kernel = self.compile(*args, **kwargs)
-@@ -582,9 +587,10 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
+@@ -582,9 +588,10 @@ class JITImpl(Generic[_P, _KP, _T, _Ret]):
                  name = getattr(self.func, "__name__", repr(self.func))
                  call = ", ".join([*map(repr, args), *(f"{k}={v!r}" for k, v in kwargs.items())])
                  raise KernelNotPreparedError(f"{error}; requested as {name}({call})") from None

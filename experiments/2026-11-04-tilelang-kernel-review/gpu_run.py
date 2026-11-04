@@ -88,6 +88,9 @@ def main():
             cache = BASE / "cache" / label
             cache.mkdir(parents=True, exist_ok=False)
             name = "tl-review-" + label.replace("_", "-")
+            arguments = job["args"]
+            if arguments[:2] == ["-m", "pytest"]:
+                arguments = ["/review/deployment/experiments/2026-11-04-tilelang-kernel-review/pytest_run.py", *arguments[2:]]
             command = [
                 "docker", "run", "--rm", "--name", name, "--gpus", "all", "--network", "none",
                 "--memory", "24g", "--memory-swap", "24g", "--shm-size", "2g", "--ulimit", "core=0",
@@ -97,7 +100,7 @@ def main():
                 "--env", f"PYTHONPATH=/review/{source}", "--env", "PYTHONDONTWRITEBYTECODE=1",
                 "--env", "TILELANG_CACHE_DIR=/cache/tilelang", "--env", "CUDA_CACHE_PATH=/cache/driver",
                 "--env", "VLLM_PLUGINS=", "--env", "NO_GIT_VERSION=1", "--workdir", "/out",
-                "--entrypoint", "/usr/bin/timeout", image, str(job.get("timeout_seconds", 300)), "python3", *job["args"],
+                "--entrypoint", "/usr/bin/timeout", image, str(job.get("timeout_seconds", 300)), "python3", *arguments,
             ]
             receipt = {
                 "label": label, "started_utc": now(), "image": image, "source": source, "command": command,
