@@ -131,6 +131,34 @@ def clamp(dtype):
             "symmetric": timing(lambda: new(x, after))}
 
 
+def clamp_edges(dtype):
+    bits = {
+        "float32": [0x7FC12345, 0xFFC54321, 0x7FA12345, 0xFFA12345, 1, 0x80000001, 0x007FFFFF, 0x807FFFFF,
+                    0, 0x80000000, 0x7F800000, 0xFF800000, 0x40E00000, 0xC0E00000, 0x41000000, 0xC1000000],
+        "float16": [0x7E21, 0xFE21, 0x7D21, 0xFD21, 1, 0x8001, 0x03FF, 0x83FF,
+                    0, 0x8000, 0x7C00, 0xFC00, 0x4700, 0xC700, 0x4800, 0xC800],
+        "bfloat16": [0x7FC1, 0xFFC1, 0x7FA1, 0xFFA1, 1, 0x8001, 0x007F, 0x807F,
+                     0, 0x8000, 0x7F80, 0xFF80, 0x40E0, 0xC0E0, 0x4100, 0xC100],
+    }[dtype]
+    width = 32 if dtype == "float32" else 16
+    integer = torch.int32 if width == 32 else torch.int16
+    signed = [b if b < 2 ** (width - 1) else b - 2**width for b in bits]
+    x = torch.tensor(signed, dtype=integer, device="cuda").view(getattr(torch, dtype))
+    before, after = torch.empty_like(x), torch.empty_like(x)
+    clamp_kernel(len(bits), dtype, False)(x, before)
+    clamp_kernel(len(bits), dtype, True)(x, after)
+    finite = ~torch.isnan(x)
+    assert torch.equal(before.view(integer)[finite], after.view(integer)[finite])
+    assert torch.equal(torch.isnan(before), torch.isnan(after))
+    unsigned = lambda t: [int(v) & (2**width - 1) for v in t.view(integer).cpu().tolist()]
+    old_bits, new_bits = unsigned(before), unsigned(after)
+    return {"input_bits": bits, "compare_select_bits": old_bits, "symmetric_bits": new_bits,
+            "finite_bits_equal": True, "nan_propagation_equal": True,
+            "nan_output_bits_equal": old_bits[:4] == new_bits[:4],
+            "old_preserves_input_nan_bits": old_bits[:4] == bits[:4],
+            "new_preserves_input_nan_bits": new_bits[:4] == bits[:4]}
+
+
 def reduce_kernel(rows, width, threads, op="sum", dtype="float32"):
     @T.prim_func
     def main(X: T.Tensor((rows, width), dtype), Y: T.Tensor((rows,), dtype)):
@@ -280,7 +308,7 @@ def prepare(strict=False):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("case", choices=["clamp", "reductions", "layout", "prefetch", "redux", "ws3661", "ws3537", "prepare"])
+    parser.add_argument("case", choices=["clamp", "clamp-edges", "reductions", "layout", "prefetch", "redux", "ws3661", "ws3537", "prepare"])
     parser.add_argument("--layout", choices=["inferred", "swizzled", "linear"])
     parser.add_argument("--disable-tma", action="store_true")
     parser.add_argument("--strict-prepare", action="store_true")
@@ -289,6 +317,9 @@ def main():
     if args.case == "clamp":
         for dtype in ("float32", "float16", "bfloat16"):
             check(dtype, lambda dtype=dtype: clamp(dtype))
+    elif args.case == "clamp-edges":
+        for dtype in ("float32", "float16", "bfloat16"):
+            check(dtype, lambda dtype=dtype: clamp_edges(dtype))
     elif args.case == "reductions":
         for width, threads in ((256, 128), (1024, 256)):
             for op in ("sum", "max"):

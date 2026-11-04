@@ -1,0 +1,175 @@
+{
+  "host": "sp8",
+  "independent_sp8_authorized": true,
+  "jobs": [
+    {
+      "label": "ws3661-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3661-pr3661-b-v2",
+      "source": "variants/pr3661",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3661"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "ws3537-pr3537-b-v2",
+      "source": "variants/pr3537",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "ws3537"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-without-3715-b-v2",
+      "source": "variants/without-3715",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "reductions-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "reductions"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "clamp-pr3605-b-v2",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "prefetch-pr3490-b-v2",
+      "source": "variants/pr3490",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "prefetch"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "redux-base-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "redux"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmatrue-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-inferred-tmafalse-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "inferred",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmatrue-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-swizzled-tmafalse-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "swizzled",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmatrue-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "layout-linear-tmafalse-b-v2",
+      "source": "variants/base",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "layout",
+        "--layout",
+        "linear",
+        "--disable-tma"
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "label": "clamp-edges-a",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp-edges"
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "label": "clamp-edges-b",
+      "source": "variants/pr3605",
+      "args": [
+        "/review/deployment/experiments/2026-11-04-tilelang-kernel-review/standalone.py",
+        "clamp-edges"
+      ],
+      "timeout_seconds": 180
+    }
+  ],
+  "wait_for_window": true
+}

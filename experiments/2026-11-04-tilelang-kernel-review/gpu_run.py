@@ -37,10 +37,12 @@ def main():
     hold = Path.home() / "spark-hold.json"
     started_waiting = time.monotonic()
     waiting_reported = False
+    request = Path.home() / "spark-request.json"
     while True:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            if not hold.exists():
+            foreign_request = request.exists() and json.loads(request.read_text()).get("who") != HOLDER
+            if not hold.exists() and not foreign_request:
                 break
             fcntl.flock(lock, fcntl.LOCK_UN)
         except BlockingIOError:
@@ -51,7 +53,6 @@ def main():
             print("WAIT for sp8's existing reservation; no GPU job launched", flush=True)
             waiting_reported = True
         time.sleep(5)
-    request = Path.home() / "spark-request.json"
     if request.exists() and json.loads(request.read_text()).get("who") == HOLDER:
         request.unlink()
     processes = subprocess.check_output(
