@@ -16,9 +16,7 @@
     "environment": {
       "GLOO_SOCKET_IFNAME": "ring0",
       "TP_SOCKET_IFNAME": "ring0",
-      "NCCL_SOCKET_IFNAME": "ring0",
-      "NCCL_DEBUG": "INFO",
-      "NCCL_DEBUG_SUBSYS": "INIT,NET,ENV"
+      "NCCL_SOCKET_IFNAME": "ring0"
     },
     "deployment": {
       "repository": "https://github.com/ivanfioravanti/spark-ds41f.git",
