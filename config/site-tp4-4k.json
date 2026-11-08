@@ -20,7 +20,7 @@
     },
     "deployment": {
       "repository": "https://github.com/ivanfioravanti/spark-ds41f.git",
-      "branch": "site"
+      "branch": "site-1107"
     },
     "distributed": {
       "master_addr": "10.10.100.1"
