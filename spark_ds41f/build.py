@@ -8,6 +8,7 @@ import concurrent.futures
 import fcntl
 import functools
 import hashlib
+import http.client
 import json
 import os
 import random
@@ -41,16 +42,84 @@ from .config import *  # noqa: F401,F403
 from .doctor import *  # noqa: F401,F403
 from .cluster import *  # noqa: F401,F403
 
+def series_files_and_entries(path: Path) -> tuple[tuple[Path, ...], list[str]]:
+    """Read an ordered patch series, expanding ``include <relative-series>`` lines."""
+    root_dir = path.parent
+    root_resolved = root_dir.resolve()
+    visited: list[Path] = []
+    entries: list[str] = []
+
+    def walk(current: Path, ancestors: tuple[Path, ...]) -> None:
+        resolved = current.resolve()
+        if resolved in ancestors:
+            raise SystemExit(f"patch series include cycle: {current}")
+        if current not in visited:
+            visited.append(current)
+        next_ancestors = (*ancestors, resolved)
+        current_resolved_dir = current.parent.resolve()
+        for raw_line in current.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("include") and (len(line) == 7 or line[7].isspace()):
+                parts = line.split(None, 1)
+                if len(parts) < 2 or not parts[1].strip():
+                    raise SystemExit(f"{current}: include directive requires a series path")
+                target = current.parent / parts[1].strip()
+                if target.resolve() in next_ancestors:
+                    raise SystemExit(f"patch series include cycle: {target}")
+                if not target.is_file():
+                    entries.append(Path(os.path.relpath(target.resolve(), root_resolved)).as_posix())
+                    continue
+                walk(target, next_ancestors)
+                continue
+            if line.startswith("TODO-") or current.parent == root_dir:
+                entries.append(line)
+            else:
+                resolved_patch = (current_resolved_dir / line).resolve()
+                entries.append(Path(os.path.relpath(resolved_patch, root_resolved)).as_posix())
+
+    walk(path, ())
+    return tuple(visited), entries
+
+
 def read_series(path: Path) -> list[str]:
-    return [
-        line.strip()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
+    return series_files_and_entries(path)[1]
 
 
 def checked(command: list[str], cwd: Path | None = None) -> None:
     subprocess.run(command, cwd=cwd, check=True)
+
+
+DISPOSABLE_GIT_CONFIG = (
+    ("gc.auto", "0"),
+    ("maintenance.auto", "false"),
+)
+DISPOSABLE_GIT_ARGS = ("-c", "gc.auto=0", "-c", "maintenance.auto=false")
+
+
+def init_disposable_git_repo(directory: Path) -> None:
+    """Initialize a temporary Git repository with background auto-GC and maintenance disabled."""
+    checked(["git", *DISPOSABLE_GIT_ARGS, "init", "--quiet"], cwd=directory)
+    for key, value in DISPOSABLE_GIT_CONFIG:
+        checked(["git", "config", key, value], cwd=directory)
+
+
+def apply_patch_series(directory: Path, series_dir: Path, patch_names: list[str]) -> None:
+    """Apply an ordered patch series in a single ``git am`` invocation with auto-GC disabled."""
+    if not patch_names:
+        return
+    checked(
+        [
+            "git",
+            *DISPOSABLE_GIT_ARGS,
+            "-c", f"user.name={PATCH_COMMITTER[0]}",
+            "-c", f"user.email={PATCH_COMMITTER[1]}",
+            "am", "--quiet", "--committer-date-is-author-date",
+            *(str(series_dir / patch_name) for patch_name in patch_names),
+        ],
+        cwd=directory,
+    )
 
 
 def command_upstream(args: argparse.Namespace) -> int:
@@ -69,19 +138,21 @@ def command_upstream(args: argparse.Namespace) -> int:
     if destination.exists():
         raise SystemExit(f"{destination} already exists; remove it explicitly to recreate")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    checked(["git", "clone", source["upstream"], str(destination)])
+    checked(["git", *DISPOSABLE_GIT_ARGS, "clone", source["upstream"], str(destination)])
+    for key, value in DISPOSABLE_GIT_CONFIG:
+        checked(["git", "config", key, value], cwd=destination)
     checked(["git", "remote", "rename", "origin", "upstream"], cwd=destination)
     contribution = source.get("contribution_remote")
     if contribution:
         checked(["git", "remote", "add", "origin", contribution], cwd=destination)
     # Release commits are not always reachable from the canonical default branch.
     # Fetch the full pinned object explicitly before detaching at it.
-    checked(["git", "fetch", "upstream", source["revision"]], cwd=destination)
+    checked(["git", *DISPOSABLE_GIT_ARGS, "fetch", "upstream", source["revision"]], cwd=destination)
     checked(["git", "checkout", "--detach", source["revision"]], cwd=destination)
     if source.get("submodules"):
-        checked(["git", "submodule", "update", "--init", "--recursive"], cwd=destination)
+        checked(["git", *DISPOSABLE_GIT_ARGS, "submodule", "update", "--init", "--recursive"], cwd=destination)
     for commit in source.get("applied_upstream_commits", []):
-        checked(["git", "fetch", "upstream", commit["revision"]], cwd=destination)
+        checked(["git", *DISPOSABLE_GIT_ARGS, "fetch", "upstream", commit["revision"]], cwd=destination)
         checked(
             ["git", "cherry-pick", "--no-commit", commit["revision"]],
             cwd=destination,
@@ -150,7 +221,9 @@ def expected_wheel_hashes() -> dict[str, str]:
     return expected
 
 
-_PATCHSET_SHA256_CACHE: dict[tuple[Path, str | None, int | None, tuple[str, ...]], str] = sys.__dict__.setdefault(
+_PATCHSET_SHA256_CACHE: dict[
+    tuple[Path, str | None, tuple[tuple[Path, int | None], ...] | None, tuple[str, ...]], str
+] = sys.__dict__.setdefault(
     "_spark_patchset_sha256_cache", {}
 )
 
@@ -160,8 +233,16 @@ def patchset_sha256(source: dict) -> str:
     series = source.get("patch_series")
     series_path = ROOT / series if series else None
     cacheable = getattr(read_series, "__module__", None) == __name__
-    mtime_ns = series_path.stat().st_mtime_ns if cacheable and series_path and series_path.is_file() else None
-    key = (ROOT, series, mtime_ns, commits)
+    if cacheable and series_path and series_path.is_file():
+        series_files, entries = series_files_and_entries(series_path)
+        mtimes: tuple[tuple[Path, int | None], ...] | None = tuple(
+            (f.resolve(), f.stat().st_mtime_ns if f.is_file() else None)
+            for f in series_files
+        )
+    else:
+        series_files, entries = ((), [])
+        mtimes = None
+    key = (ROOT, series, mtimes, commits)
     if cacheable and key in _PATCHSET_SHA256_CACHE:
         return _PATCHSET_SHA256_CACHE[key]
     digest = hashlib.sha256()
@@ -169,8 +250,16 @@ def patchset_sha256(source: dict) -> str:
         digest.update(revision.encode())
         digest.update(b"\0")
     if series_path is not None:
-        digest.update(series_path.read_bytes())
-        for patch_name in read_series(series_path):
+        if cacheable and len(series_files) > 1:
+            digest.update(b"series-include-v1\0")
+            for included in series_files:
+                digest.update(included.read_bytes())
+                digest.update(b"\0")
+            patch_names = entries
+        else:
+            digest.update(series_path.read_bytes())
+            patch_names = read_series(series_path)
+        for patch_name in patch_names:
             if patch_name.startswith("TODO-"):
                 continue
             digest.update(patch_name.encode())
@@ -201,6 +290,34 @@ INDEPENDENT_BUILD_PROJECTS = ("sparknet",)
 SPARKNET_CAPABILITY = "tilelang-sparknet-collectives"
 BUILD_PARTS = ("vllm", "nccl", "cutlass", "wheels")
 BUILD_CONTEXTS = ("vllm-source", "nccl-source", "cutlass-source", "cutlass-dsl-wheels", "vllm-deletions")
+# A lock may list sources.cuda_toolkit: Debian packages of a newer CUDA toolkit for the
+# base image's Ubuntu, each locked by file, size and SHA-256. Each supported version
+# names the Dockerfile stage that installs it (CUDA_STAGE, which the builder stages and
+# runtime-core start from) and the stage that re-wires and checks it on runtime-core
+# (RUNTIME_CORE_STAGE). A lock without it builds on the base image's CUDA 13.0.2 with
+# neither argument nor the cuda-toolkit-debs context.
+CUDA_TOOLKIT_STAGES = {"13.5.37": ("cuda-13-5", "runtime-core-cuda-13-5")}
+CUDA_TOOLKIT_CONTEXT = "cuda-toolkit-debs"
+CUDA_TOOLKIT_LINE = re.compile(
+    r"^(?P<package>[a-z0-9][a-z0-9+.-]+)=(?P<version>[0-9A-Za-z.+~:-]+)\s+"
+    r"(?P<filename>\S+)\s+(?P<size>[0-9]+)\s+sha256:(?P<sha256>[0-9a-f]{64})$"
+)
+# A lock that lists a CUDA toolkit may also list sources.torch: the wheels of a torch build and
+# of every package it requires, each locked by file, size, SHA-256 and URL. Each supported
+# version names the CUDA toolkit it was compiled for (which the lock must list), the stage that
+# installs the wheels over the base image's torch (CUDA_STAGE, so every native extension is
+# built against it) and the stage that checks it on runtime-core (RUNTIME_CORE_STAGE).
+TORCH_STAGES = {
+    "2.16.0.dev20261113+cu135": ("13.5.37", "cuda-13-5-torch-2-16", "runtime-core-cuda-13-5-torch-2-16"),
+}
+TORCH_CONTEXT = "torch-wheels"
+TORCH_LINE = re.compile(
+    r"^(?P<filename>[A-Za-z0-9_.+-]+\.whl)\s+(?P<size>[0-9]+)\s+sha256:(?P<sha256>[0-9a-f]{64})\s+"
+    r"(?P<url>https://\S+)$"
+)
+# The Dockerfile's default: NCCL 2.30.7, which the base image's torch was compiled against.
+NCCL_VERSION_CODE = 23007
+NCCL_TAG = re.compile(r"^refs/tags/v(?P<major>[0-9]+)\.(?P<minor>[0-9]+)\.(?P<patch>[0-9]+)-[0-9]+$")
 # The projects a lock may list or leave out, each with a <name>-source context.
 LISTED_BUILD_PROJECTS = (*LEGACY_BUILD_PROJECTS, *OPTIONAL_BUILD_PROJECTS, *INDEPENDENT_BUILD_PROJECTS)
 # git am with a fixed committer and committer date reproduces the recorded
@@ -237,16 +354,25 @@ print("GPU import smoke passed")
 # collectives with the kernel-family switch.
 B12X_ROCE_IMPORT = "import vllm.distributed.device_communicators.b12x_roce_all_reduce  # noqa: F401\n"
 B12X_MLA_IMPORT = "import vllm.v1.attention.backends.mla.b12x_mla_sparse  # noqa: F401\n"
-# An image whose lock does not list B12X: the package must be absent, and the DS4.1
-# modules that used it (Engram, the packed head's packer) import without it.
+# An image whose lock does not list B12X: the package must be absent, and every DS4.1
+# module imports without it and loads no B12X module. (It named one module,
+# tilelang.vocab_pack, which no B12X-free series has: candidate-55's #1096 moves the
+# packed head off B12X in place.)
 WITHOUT_B12X_SMOKE = """\
+import importlib
 import importlib.util
+import pkgutil
+import sys
 
 assert importlib.util.find_spec("b12x") is None, "B12X is installed"
-import vllm.models.deepseek_v4_1.common.engram  # noqa: F401
-import vllm.models.deepseek_v4_1.tilelang.vocab_pack  # noqa: F401
+import vllm.models.deepseek_v4_1 as dsv41
 
-print("B12X is not installed; the DS4.1 modules import without it")
+names = sorted(info.name for info in pkgutil.walk_packages(dsv41.__path__, dsv41.__name__ + "."))
+for name in names:
+    importlib.import_module(name)
+loaded = sorted(name for name in sys.modules if name == "b12x" or name.startswith("b12x."))
+assert not loaded, loaded
+print(f"B12X is not installed; the {len(names)} DS4.1 modules import without it")
 """
 
 
@@ -256,7 +382,151 @@ def build_projects(sources: dict) -> tuple[str, ...]:
 
 
 def build_contexts(inputs: dict) -> tuple[str, ...]:
-    return BUILD_CONTEXTS + tuple(f"{name}-source" for name in LISTED_BUILD_PROJECTS if name in inputs)
+    contexts = BUILD_CONTEXTS + tuple(f"{name}-source" for name in LISTED_BUILD_PROJECTS if name in inputs)
+    contexts += (CUDA_TOOLKIT_CONTEXT,) if "cuda_toolkit" in inputs else ()
+    return contexts + ((TORCH_CONTEXT,) if "torch" in inputs else ())
+
+
+def cuda_toolkit_debs(lockfile: str) -> dict[str, dict]:
+    """The Debian packages a CUDA toolkit lockfile lists, by file name (ValueError when malformed):
+    one ``package=version filename size sha256:<hex>`` line each, the file named as apt names it."""
+    debs: dict[str, dict] = {}
+    packages: set[str] = set()
+    for number, raw_line in enumerate((ROOT / lockfile).read_text(encoding="utf-8").splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = CUDA_TOOLKIT_LINE.match(line)
+        if match is None:
+            raise ValueError(f"line {number} is not 'package=version filename size sha256:<hex>'")
+        package, version, filename = match["package"], match["version"], match["filename"]
+        stem = f"{package}_{version.split(':', 1)[-1]}_"
+        if filename not in (f"{stem}arm64.deb", f"{stem}all.deb"):
+            raise ValueError(f"line {number}: {filename} is not {stem}<arm64|all>.deb")
+        if package in packages or filename in debs:
+            raise ValueError(f"line {number}: {package} is listed twice")
+        if int(match["size"]) <= 0:
+            raise ValueError(f"line {number}: {filename} has no size")
+        packages.add(package)
+        debs[filename] = {"package": package, "version": version,
+                          "size": int(match["size"]), "sha256": match["sha256"]}
+    if not debs:
+        raise ValueError("it lists no package")
+    return debs
+
+
+def cuda_toolkit_problems(sources: dict) -> list[str]:
+    """Problems with a lock's optional sources.cuda_toolkit; none when the lock omits it."""
+    source = sources.get("cuda_toolkit")
+    if source is None:
+        return []
+    if not isinstance(source, dict):
+        return ["cuda_toolkit: the source must be an object"]
+    problems = []
+    if source.get("kind") != "deb":
+        problems.append("cuda_toolkit: kind must be deb")
+    upstream = source.get("upstream")
+    if not isinstance(upstream, str) or not upstream.startswith("https://"):
+        problems.append("cuda_toolkit: upstream must be the https:// apt repository the packages come from")
+    version = source.get("version")
+    if version not in CUDA_TOOLKIT_STAGES:
+        problems.append(f"cuda_toolkit: no Dockerfile stage installs CUDA {version!r} "
+                        f"(supported: {', '.join(CUDA_TOOLKIT_STAGES)})")
+    lockfile = source.get("lockfile")
+    if not isinstance(lockfile, str) or not lockfile or not (ROOT / lockfile).is_file():
+        problems.append(f"cuda_toolkit: missing package lock {lockfile}")
+        return problems
+    try:
+        debs = cuda_toolkit_debs(lockfile)
+    except ValueError as error:
+        problems.append(f"cuda_toolkit: {lockfile}: {error}")
+        return problems
+    if version in CUDA_TOOLKIT_STAGES:
+        nvcc = "cuda-nvcc-" + "-".join(version.split(".")[:2])
+        versions = [deb["version"] for deb in debs.values() if deb["package"] == nvcc]
+        if not versions or not versions[0].startswith(f"{version}-"):
+            problems.append(f"cuda_toolkit: {lockfile} must list {nvcc} at {version}")
+    return problems
+
+
+def torch_wheels(lockfile: str) -> dict[str, dict]:
+    """The wheels a torch lockfile lists, by file name (ValueError when malformed): one
+    ``filename size sha256:<hex> url`` line each, one wheel a distribution."""
+    wheels: dict[str, dict] = {}
+    distributions: set[str] = set()
+    for number, raw_line in enumerate((ROOT / lockfile).read_text(encoding="utf-8").splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = TORCH_LINE.match(line)
+        if match is None:
+            raise ValueError(f"line {number} is not 'filename.whl size sha256:<hex> https://url'")
+        filename = match["filename"]
+        distribution = filename.split("-", 1)[0].lower()
+        if distribution in distributions:
+            raise ValueError(f"line {number}: {distribution} is listed twice")
+        if int(match["size"]) <= 0:
+            raise ValueError(f"line {number}: {filename} has no size")
+        distributions.add(distribution)
+        wheels[filename] = {"size": int(match["size"]), "sha256": match["sha256"], "url": match["url"]}
+    if not wheels:
+        raise ValueError("it lists no wheel")
+    return wheels
+
+
+def torch_problems(sources: dict) -> list[str]:
+    """Problems with a lock's optional sources.torch; none when the lock omits it."""
+    source = sources.get("torch")
+    if source is None:
+        return []
+    if not isinstance(source, dict):
+        return ["torch: the source must be an object"]
+    problems = []
+    if source.get("kind") != "wheel":
+        problems.append("torch: kind must be wheel")
+    upstream = source.get("upstream")
+    if not isinstance(upstream, str) or not upstream.startswith("https://"):
+        problems.append("torch: upstream must be the https:// index the wheels come from")
+    version = source.get("version")
+    if version not in TORCH_STAGES:
+        problems.append(f"torch: no Dockerfile stage installs torch {version!r} "
+                        f"(supported: {', '.join(TORCH_STAGES)})")
+    else:
+        toolkit = sources.get("cuda_toolkit")
+        toolkit_version = toolkit.get("version") if isinstance(toolkit, dict) else None
+        if toolkit_version != TORCH_STAGES[version][0]:
+            problems.append(f"torch: {version} is compiled for CUDA {TORCH_STAGES[version][0]}, "
+                            f"but the lock's cuda_toolkit is {toolkit_version!r}")
+    lockfile = source.get("lockfile")
+    if not isinstance(lockfile, str) or not lockfile or not (ROOT / lockfile).is_file():
+        problems.append(f"torch: missing wheel lock {lockfile}")
+        return problems
+    try:
+        wheels = torch_wheels(lockfile)
+    except ValueError as error:
+        problems.append(f"torch: {lockfile}: {error}")
+        return problems
+    if version in TORCH_STAGES and not any(name.startswith(f"torch-{version}-") for name in wheels):
+        problems.append(f"torch: {lockfile} must list torch at {version}")
+    return problems
+
+
+def cuda_stages(inputs: dict) -> tuple[str, str] | None:
+    """The stages a lock's CUDA toolkit, and its torch when it lists one, select (CUDA_STAGE,
+    RUNTIME_CORE_STAGE); None keeps the base image's CUDA and both Dockerfile defaults."""
+    if "torch" in inputs:
+        return TORCH_STAGES[inputs["torch"]["version"]][1:]
+    toolkit = inputs.get("cuda_toolkit")
+    return None if toolkit is None else CUDA_TOOLKIT_STAGES[toolkit["version"]]
+
+
+def nccl_version_code(inputs: dict) -> int:
+    """NCCL_VERSION_CODE of the NCCL tag a lock tracks (2.32.3 is 23203), which the image build
+    checks the installed library against; the Dockerfile's default for any other ref."""
+    match = NCCL_TAG.match(inputs["nccl"].get("tracking_ref", ""))
+    if match is None:
+        return NCCL_VERSION_CODE
+    return int(match["major"]) * 10000 + int(match["minor"]) * 100 + int(match["patch"])
 
 
 def runtime_stage(inputs: dict) -> str | None:
@@ -284,8 +554,12 @@ def final_stage(cluster: dict, stage: str | None) -> str | None:
 
 
 def tilelang_base_stage(inputs: dict) -> str:
-    """The Dockerfile stage the TileLang runtime builds on: B12X's while the lock lists it."""
-    return "runtime" if "b12x" in inputs else "runtime-core"
+    """The Dockerfile stage the TileLang runtime builds on: B12X's while the lock lists it,
+    else runtime-core (re-wired for the lock's CUDA toolkit when it lists one)."""
+    if "b12x" in inputs:
+        return "runtime"
+    stages = cuda_stages(inputs)
+    return "runtime-core" if stages is None else stages[1]
 
 
 def missing_patches(source: dict) -> list[str]:
@@ -616,29 +890,20 @@ def lock_build_identifiers(
             BUILD_ROOT.mkdir(parents=True, exist_ok=True)
             temporary = Path(tempfile.mkdtemp(prefix=f".lock-{name}.", dir=BUILD_ROOT))
             try:
-                checked(["git", "init", "--quiet"], cwd=temporary)
+                init_disposable_git_repo(temporary)
                 checked(["git", "remote", "add", "upstream", source["upstream"]], cwd=temporary)
                 checked(
-                    ["git", "fetch", "--quiet", "--filter=blob:none", "--no-tags", "upstream", source["revision"]],
+                    ["git", *DISPOSABLE_GIT_ARGS, "fetch", "--quiet", "--filter=blob:none", "--no-tags", "upstream", source["revision"]],
                     cwd=temporary,
                 )
                 checked(["git", "switch", "--quiet", "--create", "spark/build", "FETCH_HEAD"], cwd=temporary)
                 if source.get("patch_series"):
                     series = ROOT / source["patch_series"]
-                    for patch_name in active_series_patches(series):
-                        checked(
-                            [
-                                "git", "-c", f"user.name={PATCH_COMMITTER[0]}",
-                                "-c", f"user.email={PATCH_COMMITTER[1]}",
-                                "am", "--quiet", "--committer-date-is-author-date",
-                                str(series.parent / patch_name),
-                            ],
-                            cwd=temporary,
-                        )
+                    apply_patch_series(temporary, series.parent, active_series_patches(series))
                 checked(["git", "diff", "--check", source["revision"], "HEAD"], cwd=temporary)
                 if source.get("submodules"):
                     checked(
-                        ["git", "submodule", "update", "--quiet", "--init", "--recursive",
+                        ["git", *DISPOSABLE_GIT_ARGS, "submodule", "update", "--quiet", "--init", "--recursive",
                          "--depth", "1", "--jobs", "4"],
                         cwd=temporary,
                     )
@@ -728,6 +993,26 @@ def build_inputs(upstreams: dict, parts: list[str] | None = None) -> dict:
             inputs[name]["submodules"] = record["submodules"]
     if sources["vllm"].get("canonical_base"):
         inputs["vllm"]["canonical_upstream"] = sources["vllm"]["canonical_base"]["upstream"]
+    # Only a lock that lists a CUDA toolkit records one, so every other lock keeps its
+    # inputs and its build directory.
+    toolkit_problems = cuda_toolkit_problems(sources)
+    if toolkit_problems:
+        raise SystemExit("; ".join(toolkit_problems))
+    if "cuda_toolkit" in sources:
+        toolkit = sources["cuda_toolkit"]
+        inputs["cuda_toolkit"] = {
+            "upstream": toolkit["upstream"].rstrip("/"),
+            "version": toolkit["version"],
+            "debs": cuda_toolkit_debs(toolkit["lockfile"]),
+        }
+    wheel_set_problems = torch_problems(sources)
+    if wheel_set_problems:
+        raise SystemExit("; ".join(wheel_set_problems))
+    if "torch" in sources:
+        inputs["torch"] = {
+            "version": sources["torch"]["version"],
+            "wheels": torch_wheels(sources["torch"]["lockfile"]),
+        }
     return inputs
 
 
@@ -786,31 +1071,22 @@ def prepare_project(directory: Path, name: str, record: dict) -> None:
     source.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=f".{name}.", dir=source.parent))
     try:
-        checked(["git", "init", "--quiet"], cwd=temporary)
+        init_disposable_git_repo(temporary)
         checked(["git", "remote", "add", "upstream", record["upstream"]], cwd=temporary)
         checked(
-            ["git", "fetch", "--quiet", "--filter=blob:none", "--no-tags", "upstream", record["revision"]],
+            ["git", *DISPOSABLE_GIT_ARGS, "fetch", "--quiet", "--filter=blob:none", "--no-tags", "upstream", record["revision"]],
             cwd=temporary,
         )
         checked(["git", "switch", "--quiet", "--create", "spark/build", "FETCH_HEAD"], cwd=temporary)
         if record.get("patch_series"):
             series = ROOT / record["patch_series"]
-            for patch_name in read_series(series):
-                checked(
-                    [
-                        "git", "-c", f"user.name={PATCH_COMMITTER[0]}",
-                        "-c", f"user.email={PATCH_COMMITTER[1]}",
-                        "am", "--quiet", "--committer-date-is-author-date",
-                        str(series.parent / patch_name),
-                    ],
-                    cwd=temporary,
-                )
+            apply_patch_series(temporary, series.parent, read_series(series))
         checked(["git", "diff", "--check", record["revision"], "HEAD"], cwd=temporary)
         if record.get("submodules") is not None:
             # The commits the patched superproject records, nested ones
             # included; project_problems compares them with the manifest.
             checked(
-                ["git", "submodule", "update", "--quiet", "--init", "--recursive",
+                ["git", *DISPOSABLE_GIT_ARGS, "submodule", "update", "--quiet", "--init", "--recursive",
                  "--depth", "1", "--jobs", "4"],
                 cwd=temporary,
             )
@@ -832,9 +1108,9 @@ def prepare_cutlass(directory: Path, record: dict) -> None:
     source.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(prefix=".cutlass.", dir=source.parent))
     try:
-        checked(["git", "init", "--quiet"], cwd=temporary)
+        init_disposable_git_repo(temporary)
         checked(["git", "remote", "add", "upstream", record["upstream"]], cwd=temporary)
-        checked(["git", "fetch", "--quiet", "--depth", "1", "upstream", record["revision"]], cwd=temporary)
+        checked(["git", *DISPOSABLE_GIT_ARGS, "fetch", "--quiet", "--depth", "1", "upstream", record["revision"]], cwd=temporary)
         checked(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=temporary)
         if git_output(temporary, "rev-parse", "HEAD") != record["revision"]:
             raise SystemExit("cutlass: fetched revision differs from the lock")
@@ -894,6 +1170,127 @@ def prepare_wheels(directory: Path, upstreams: dict) -> None:
     print("cutlass-dsl wheels: downloaded and verified")
 
 
+def cuda_deb_verified(path: Path, record: dict) -> bool:
+    return (path.is_file() and not path.is_symlink() and path.stat().st_size == record["size"]
+            and sha256(path) == record["sha256"])
+
+
+def cuda_deb_problems(deb_dir: Path, inputs: dict) -> list[str]:
+    """Missing, unlocked and changed files in a CUDA toolkit context."""
+    if not deb_dir.is_dir():
+        return [f"{CUDA_TOOLKIT_CONTEXT}: missing"]
+    expected = inputs["cuda_toolkit"]["debs"]
+    problems = []
+    for path in sorted(deb_dir.iterdir()):
+        record = expected.get(path.name)
+        if record is None:
+            problems.append(f"{CUDA_TOOLKIT_CONTEXT}: unlocked file {path.name}")
+        elif not cuda_deb_verified(path, record):
+            problems.append(f"{CUDA_TOOLKIT_CONTEXT}: {path.name} differs from the lock size or hash")
+    for filename in sorted(set(expected) - {path.name for path in deb_dir.iterdir()}):
+        problems.append(f"{CUDA_TOOLKIT_CONTEXT}: missing {filename}")
+    return problems
+
+
+def download_cuda_deb(url: str, destination: Path, record: dict, attempts: int = 3,
+                      context: str = CUDA_TOOLKIT_CONTEXT) -> None:
+    """Stream ``url`` to ``destination``, which must then hold the locked size and SHA-256.
+    A failed or short transfer is retried; a file that differs from the lock is not."""
+    for attempt in range(1, attempts + 1):
+        digest, written = hashlib.sha256(), 0
+        try:
+            with urllib.request.urlopen(url, timeout=120) as response, destination.open("wb") as handle:
+                for chunk in iter(lambda: response.read(1024 * 1024), b""):
+                    written += len(chunk)
+                    if written > record["size"]:
+                        break
+                    digest.update(chunk)
+                    handle.write(chunk)
+            if written < record["size"]:
+                raise OSError(f"the transfer ended after {written} of {record['size']} bytes")
+        except (OSError, http.client.HTTPException) as error:
+            destination.unlink(missing_ok=True)
+            if attempt == attempts:
+                raise SystemExit(f"{context}: cannot download {url}: {error}") from error
+            print(f"{context}: {destination.name}: {error}; retrying", flush=True)
+            continue
+        if written != record["size"] or digest.hexdigest() != record["sha256"]:
+            destination.unlink(missing_ok=True)
+            raise SystemExit(f"{context}: {url} differs from the lock size or hash")
+        return
+
+
+def prepare_cuda_toolkit(directory: Path, inputs: dict) -> None:
+    """The lock's CUDA toolkit packages in context/cuda-toolkit-debs: verified files are kept,
+    the rest downloaded from the lock's repository and verified."""
+    destination = directory / "context" / CUDA_TOOLKIT_CONTEXT
+    toolkit = inputs["cuda_toolkit"]
+    verified = {filename for filename, record in toolkit["debs"].items()
+                if cuda_deb_verified(destination / filename, record)}
+    if verified == set(toolkit["debs"]) and {p.name for p in destination.iterdir()} == verified:
+        print(f"cuda-toolkit debs: reusing {len(verified)} verified packages")
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=".cuda-toolkit.", dir=destination.parent))
+    try:
+        for filename, record in sorted(toolkit["debs"].items()):
+            if filename in verified:
+                os.link(destination / filename, temporary / filename)
+            else:
+                print(f"cuda-toolkit debs: downloading {filename} ({record['size'] / 1e6:.1f} MB)", flush=True)
+                download_cuda_deb(f"{toolkit['upstream']}/{filename}", temporary / filename, record)
+        replace_directory(temporary, destination)
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+    print(f"cuda-toolkit debs: {len(toolkit['debs']) - len(verified)} downloaded, "
+          f"{len(verified)} reused, all verified against the lock")
+
+
+def torch_wheel_problems(wheel_dir: Path, inputs: dict) -> list[str]:
+    """Missing, unlocked and changed files in a torch wheel context."""
+    if not wheel_dir.is_dir():
+        return [f"{TORCH_CONTEXT}: missing"]
+    expected = inputs["torch"]["wheels"]
+    problems = []
+    for path in sorted(wheel_dir.iterdir()):
+        record = expected.get(path.name)
+        if record is None:
+            problems.append(f"{TORCH_CONTEXT}: unlocked file {path.name}")
+        elif not cuda_deb_verified(path, record):
+            problems.append(f"{TORCH_CONTEXT}: {path.name} differs from the lock size or hash")
+    for filename in sorted(set(expected) - {path.name for path in wheel_dir.iterdir()}):
+        problems.append(f"{TORCH_CONTEXT}: missing {filename}")
+    return problems
+
+
+def prepare_torch(directory: Path, inputs: dict) -> None:
+    """The lock's torch wheels in context/torch-wheels: verified files are kept, the rest
+    downloaded from the URL the lock gives each and verified."""
+    destination = directory / "context" / TORCH_CONTEXT
+    wheels = inputs["torch"]["wheels"]
+    verified = {filename for filename, record in wheels.items()
+                if cuda_deb_verified(destination / filename, record)}
+    if verified == set(wheels) and {p.name for p in destination.iterdir()} == verified:
+        print(f"torch wheels: reusing {len(verified)} verified wheels")
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(tempfile.mkdtemp(prefix=".torch-wheels.", dir=destination.parent))
+    try:
+        for filename, record in sorted(wheels.items()):
+            if filename in verified:
+                os.link(destination / filename, temporary / filename)
+            else:
+                print(f"torch wheels: downloading {filename} ({record['size'] / 1e6:.1f} MB)", flush=True)
+                download_cuda_deb(record["url"], temporary / filename, record, context=TORCH_CONTEXT)
+        replace_directory(temporary, destination)
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+    print(f"torch wheels: {len(wheels) - len(verified)} downloaded, {len(verified)} reused, "
+          "all verified against the lock")
+
+
 def export_source(source: Path, destination: Path) -> None:
     """Copy a checkout without Git metadata or bytecode, replacing atomically."""
     temporary = destination.with_name(f".{destination.name}.export")
@@ -924,7 +1321,7 @@ def vllm_deletions(directory: Path, inputs: dict) -> list[str]:
     )
     if present.returncode:
         checked(
-            ["git", "fetch", "--quiet", "--filter=blob:none", "--no-tags",
+            ["git", *DISPOSABLE_GIT_ARGS, "fetch", "--quiet", "--filter=blob:none", "--no-tags",
              inputs["vllm"]["canonical_upstream"], base],
             cwd=source,
         )
@@ -953,6 +1350,10 @@ def build_problems(directory: Path, inputs: dict) -> list[str]:
     if sorted(record.get("contexts", {})) != sorted(build_contexts(inputs)):
         problems.append("inputs.json does not record every build context")
     problems.extend(wheel_problems(directory / "context/cutlass-dsl-wheels"))
+    if "cuda_toolkit" in inputs:
+        problems.extend(cuda_deb_problems(directory / "context" / CUDA_TOOLKIT_CONTEXT, inputs))
+    if "torch" in inputs:
+        problems.extend(torch_wheel_problems(directory / "context" / TORCH_CONTEXT, inputs))
     if not (directory / "context/cutlass-source/include/cutlass/cutlass.h").is_file():
         problems.append("cutlass-source: include/cutlass/cutlass.h is missing")
     return problems
@@ -962,7 +1363,7 @@ def command_build_prepare(args: argparse.Namespace) -> int:
     cluster, _, upstreams = configuration(args)
     parts = args.only.split(",") if args.only else None
     if parts:
-        optional = LISTED_BUILD_PROJECTS
+        optional = (*LISTED_BUILD_PROJECTS, "cuda_toolkit", "torch")
         unknown = sorted(set(parts) - set(BUILD_PARTS) - set(optional))
         if unknown:
             raise SystemExit(f"unknown build parts: {', '.join(unknown)}")
@@ -981,7 +1382,8 @@ def command_build_prepare(args: argparse.Namespace) -> int:
                 print(f"WARN: {problem}")
             return 1
     directory = build_directory(inputs)
-    parts = parts or [*BUILD_PARTS, *build_projects(inputs)]
+    toolkit_part = tuple(part for part in ("cuda_toolkit", "torch") if part in inputs)
+    parts = parts or [*BUILD_PARTS, *build_projects(inputs), *toolkit_part]
     if not args.only and not build_problems(directory, inputs):
         print(f"build inputs ready: {directory.relative_to(ROOT)}")
         return 0
@@ -995,6 +1397,10 @@ def command_build_prepare(args: argparse.Namespace) -> int:
         prepare_cutlass(directory, inputs["cutlass"])
     if "wheels" in parts:
         prepare_wheels(directory, upstreams)
+    if "cuda_toolkit" in parts:
+        prepare_cuda_toolkit(directory, inputs)
+    if "torch" in parts:
+        prepare_torch(directory, inputs)
     if args.only:
         print("partial preparation; run bin/spark build prepare for the complete inputs")
         return 0
@@ -1219,6 +1625,11 @@ def command_build_image(args: argparse.Namespace) -> int:
             })
             if "version" in record:
                 build_args[f"{prefix}_VERSION"] = record["version"]
+        toolkit_stages = cuda_stages(inputs)
+        if toolkit_stages is not None:
+            build_args.update(CUDA_STAGE=toolkit_stages[0], RUNTIME_CORE_STAGE=toolkit_stages[1])
+        if nccl_version_code(inputs) != NCCL_VERSION_CODE:
+            build_args["NCCL_VERSION_CODE"] = str(nccl_version_code(inputs))
         stage = final_stage(cluster, runtime_stage(inputs))
         if stage is not None:
             build_args.update(RUNTIME_STAGE=stage, TILELANG_COMPILE_JOBS=str(jobs),
@@ -1260,6 +1671,12 @@ def command_build_image(args: argparse.Namespace) -> int:
         label = source_labels.get(image["labels"], f"{name}.tree")
         if label != inputs[name]["expected_tree"]:
             raise SystemExit(f"{tag}: label {source_labels.key(image['labels'], f'{name}.tree')} is {label!r}")
+    toolkit_label = source_labels.get(image["labels"], "cuda.version")
+    if toolkit_label != inputs.get("cuda_toolkit", {}).get("version"):
+        raise SystemExit(f"{tag}: label {source_labels.PREFIX}cuda.version is {toolkit_label!r}")
+    torch_label = source_labels.get(image["labels"], "torch.version")
+    if torch_label != inputs.get("torch", {}).get("version"):
+        raise SystemExit(f"{tag}: label {source_labels.PREFIX}torch.version is {torch_label!r}")
     print(f"built {tag} {image['id']} in {elapsed:.0f}s; lowest MemAvailable {minimum:.1f} GiB", flush=True)
     smoke_cpus = min(max_jobs, 2) if max_jobs is not None else None
     if smoke_cpus is None:

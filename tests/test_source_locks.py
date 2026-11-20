@@ -22,10 +22,47 @@ HISTORICAL_PROFILES = {
     "experiments/2026-10-04-tilelang-1m/diagnostics/shapes8.json",
     "experiments/2026-10-23-next-release/rc2/cluster.json",
     "experiments/2026-10-23-next-release/rc3/cluster.json",
+    # Restored #877/#976 LSA overlays extending config/cluster.json from the C36/C37 era before 1107 updated tilelang.tree.
+    "experiments/2026-11-04-clustered-indexer/serving/candidate.json",
+    "experiments/2026-11-04-clustered-indexer/serving/control.json",
+    "experiments/2026-11-04-clustered-indexer/serving/restore.json",
+    "experiments/2026-11-04-token-lsa/paged/aggressive-fast.json",
+    "experiments/2026-11-04-token-lsa/paged/candidate.json",
+    "experiments/2026-11-04-token-lsa/paged/control.json",
+    "experiments/2026-11-04-token-lsa/paged/dense-1024-fast.json",
+    "experiments/2026-11-04-token-lsa/paged/dense-1024.json",
+    "experiments/2026-11-04-token-lsa/paged/dense-1536-fast.json",
+    "experiments/2026-11-04-token-lsa/paged/dense-256.json",
+    "experiments/2026-11-04-token-lsa/paged/restore.json",
+    "experiments/2026-11-05-answer-quality/native-source-fast.json",
+    "experiments/2026-11-05-answer-quality/source-1024-fast.json",
+    "experiments/2026-11-05-block-load/full.json",
+    "experiments/2026-11-05-block-load/native-source.json",
+    "experiments/2026-11-05-block-load/native.json",
+    "experiments/2026-11-05-block-summary/candidate.json",
+    "experiments/2026-11-05-block-summary/control.json",
+    "experiments/2026-11-05-block-summary/native.json",
+    "experiments/2026-11-05-compact-runtime/candidate.json",
+    "experiments/2026-11-05-dense-retention/candidate.json",
+    "experiments/2026-11-05-direct-coarse-merge/candidate.json",
+    "experiments/2026-11-05-fused-candidates/candidate.json",
+    "experiments/2026-11-05-native-source/candidate.json",
+    "experiments/2026-11-05-parallel-summary/candidate.json",
+    "experiments/2026-11-05-prefill-only/candidate.json",
+    "experiments/2026-11-05-query-reuse/full.json",
+    "experiments/2026-11-05-query-reuse/native-source.json",
+    "experiments/2026-11-05-query-reuse/native.json",
+    "experiments/2026-11-05-selector-fitting/capture.json",
+    "experiments/2026-11-06-optional-lsa/tp4-default-off.json",
+    "experiments/2026-11-06-optional-lsa/tp4.json",
+    # Ran on pre-r2 c61-decode (tree 42332c66ca46) before c61-r2 updated c61-decode/tp4-dev.json to db2b19659c29.
+    "experiments/2026-11-18-ffn-prefetch-pace/tp4-pace-ref-dev.json",
+    "experiments/2026-11-18-ffn-prefetch-pace/tp4-pace0-dev.json",
+    "experiments/2026-11-18-ffn-prefetch-pace/tp4-pace50-dev.json",
+    "experiments/2026-11-18-ffn-prefetch-pace/tp4-pace100-dev.json",
 }
 
-# Early TileLang experiments whose locks pointed at the mutable root series
-# (patches/vllm/series, patches/b12x/series) before per-experiment series existed.
+# Experiments whose locks pointed at a mutable series before per-experiment or later edits.
 HISTORICAL_ROLLING_SERIES_LOCKS = {
     "experiments/2026-10-03-packed-bf16-head/tilelang-tp4/upstreams.lock.json",
     "experiments/2026-10-04-tilelang-gate-router/upstreams.lock.json",
@@ -33,6 +70,7 @@ HISTORICAL_ROLLING_SERIES_LOCKS = {
     "experiments/2026-10-04-tilelang-router/upstreams.lock.json",
     "experiments/2026-10-04-tilelang-sparknet/upstreams.lock.json",
     "experiments/2026-10-04-tilelang-vocab-heads/upstreams.lock.json",
+    "experiments/2026-11-18-ffn-prefetch-pace/upstreams.lock.json",
 }
 
 
@@ -53,6 +91,19 @@ class SourceLockTest(unittest.TestCase):
                     continue
                 problems.append(f"{rel}: {problem}")
         self.assertGreater(checked, 0)
+        self.assertEqual(problems, [])
+
+    def test_a_listed_cuda_toolkit_is_one_the_build_can_install(self) -> None:
+        # sources.cuda_toolkit is optional; where a lock lists it, its version needs a
+        # Dockerfile stage and its lockfile must parse (tests/test_build.py, CudaToolkitTest).
+        lock_paths = [ROOT / "upstreams.lock.json", *sorted((ROOT / "releases").glob("*/upstreams.lock.json")),
+                      *sorted((ROOT / "experiments").rglob("upstreams.lock.json"))]
+        problems = []
+        for lock_path in lock_paths:
+            sources = json.loads(lock_path.read_text(encoding="utf-8")).get("sources", {})
+            rel = lock_path.relative_to(ROOT).as_posix()
+            problems += [f"{rel}: {problem}" for problem in spark.cuda_toolkit_problems(sources)]
+        self.assertGreater(len(lock_paths), 3)
         self.assertEqual(problems, [])
 
     def test_arm_notes_and_expected_labels_match_locks_and_manifests(self) -> None:

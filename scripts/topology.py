@@ -46,8 +46,9 @@ def transport(cluster: dict) -> str | None:
 
 # sparknet's one-shot transports and their one-shot topology. They are always
 # on (no enable switch).
+LOCAL = "local"
 ONE_SHOT = {"oneshot-direct": "direct", "oneshot-ring4": "ring4", "oneshot-switched": "direct"}
-TRANSPORTS = (*ONE_SHOT, "nccl-ring", "nccl-switched")
+TRANSPORTS = (*ONE_SHOT, "nccl-ring", "nccl-switched", LOCAL)
 
 def switched(mode: str | None) -> bool:
     return mode in ("oneshot-switched", "nccl-switched")
@@ -106,7 +107,7 @@ def fabric_map(nodes: dict, *, strip_gid_index: bool = False) -> dict:
 def node_environment(cluster: dict, node: dict) -> dict[str, str]:
     base = {key: str(value) for key, value in cluster["environment"].items()}
     mode = transport(cluster)
-    if mode in TRANSPORTS:
+    if mode in TRANSPORTS and mode != LOCAL:
         sparknet = fabric(cluster)
         pinned = gid_pinned(cluster)
         clean_node = fabric_node(node, strip_gid_index=True)
@@ -146,6 +147,8 @@ def control_ip(node: dict) -> str:
 
 def hcas(cluster: dict, node: dict) -> list[str]:
     """The node's RDMA devices for the configured transport."""
+    if transport(cluster) == LOCAL:
+        return []
     return fabric(cluster).nodes.nccl_hcas(fabric_node(node), transport(cluster))
 
 
@@ -170,17 +173,29 @@ def problems(cluster: dict, nodes: dict) -> list[str]:
                 errors.append(f"{node.get('name')}: roce_gid_index must be a nonnegative integer")
     count = len(entries)
     mode = transport(cluster)
-    if switched(mode):
-        if not 3 <= count <= 8:
-            errors.append(f"switched deployment requires 3 to 8 nodes, got {count}")
-    elif count not in (3, 4):
-        errors.append(f"deployment requires 3 or 4 nodes, got {count}")
+    if mode == LOCAL:
+        if count != 1:
+            errors.append(f"local deployment requires 1 node, got {count}")
+    elif switched(mode):
+        if not 2 <= count <= 8:
+            errors.append(f"switched deployment requires 2 to 8 nodes, got {count}")
+    elif count not in (2, 3, 4):
+        errors.append(f"deployment requires 2, 3 or 4 nodes, got {count}")
     settings = cluster.get("environment", {})
     if mode is None:
         errors.append("fabric.transport is required; a configuration without one ran B12X's "
                       "rocenante-direct, which is retired (docs/switchless-topology.md)")
     elif mode not in TRANSPORTS:
         errors.append(f"unknown fabric transport {mode!r}")
+    elif mode == LOCAL:
+        if count == 1:
+            head_node = entries[0]
+            if not head_node.get("head"):
+                errors.append("single-node deployment requires head=true on rank 0")
+            if head_node.get("rank") != 0:
+                errors.append("single-node deployment requires rank=0")
+            if not head_node.get("name") or not head_node.get("management_ip"):
+                errors.append("single-node deployment requires name and management_ip")
     else:
         sparknet = fabric(cluster)
         errors.extend(sparknet.nodes.problems(fabric_map(nodes, strip_gid_index=True), mode))
@@ -198,6 +213,7 @@ def problems(cluster: dict, nodes: dict) -> list[str]:
             errors.append(f"{mode} requires explicit fabric.topology=switched")
         for key in ("NCCL_SWITCHLESS_BIDIRECTIONAL", "NCCL_MIN_TRAFFIC_PER_CHANNEL",
                     "NCCL_THREAD_THRESHOLDS", "NCCL_ALGO", "NCCL_MIN_NCHANNELS",
+                    "NCCL_P2P_NET_CHUNKSIZE",
                     "NCCL_ALGO_PLUGIN", "NCCL_TUNER_PLUGIN", "NCCL_GRAPH_FILE", "NCCL_TOPO_FILE"):
             if key in settings:
                 errors.append(f"{mode} must omit stale ring/topology control {key}")
@@ -208,6 +224,14 @@ def problems(cluster: dict, nodes: dict) -> list[str]:
             errors.append("nccl-switched runs plain NCCL; it requires --disable-custom-all-reduce")
     elif cluster.get("fabric", {}).get("topology") == "switched":
         errors.append("fabric.topology=switched requires an explicit switched transport")
+    else:
+        bidirectional = settings.get("NCCL_SWITCHLESS_BIDIRECTIONAL")
+        if bidirectional is not None:
+            if str(bidirectional) not in ("1", "2"):
+                errors.append("NCCL_SWITCHLESS_BIDIRECTIONAL must be 1 or 2")
+            channels = str(settings.get("NCCL_MAX_NCHANNELS", ""))
+            if str(bidirectional) == "2" and channels.isdigit() and int(channels) > 2 and int(channels) % 4 != 0:
+                errors.append("NCCL_SWITCHLESS_BIDIRECTIONAL=2 needs two or a multiple of four channels")
     if mode is not None and not is_sparknet(mode) and any(k.startswith("SPARKNET_ROCE_") for k in settings):
         errors.append(f"{mode} does not run sparknet; SPARKNET_ROCE_* settings do not apply")
     for flag in ("--tensor-parallel-size", "--nnodes"):
@@ -321,6 +345,7 @@ def candidate(base: dict, nodes: dict, nodes_path: str) -> dict:
         result.pop("benchmark_reference", None)
         for key in ("NCCL_SWITCHLESS_BIDIRECTIONAL", "NCCL_MIN_TRAFFIC_PER_CHANNEL",
                     "NCCL_THREAD_THRESHOLDS", "NCCL_ALGO", "NCCL_MIN_NCHANNELS",
+                    "NCCL_P2P_NET_CHUNKSIZE",
                     "NCCL_ALGO_PLUGIN", "NCCL_TUNER_PLUGIN", "NCCL_GRAPH_FILE", "NCCL_TOPO_FILE",
                     "NCCL_COLLNET_ENABLE", "NCCL_CUMEM_HOST_ENABLE", "NCCL_GIN_ENABLE",
                     "NCCL_IB_SUBNET_PREFIX_LEN", "NCCL_MNNVL_ENABLE", "NCCL_PAT_ENABLE",

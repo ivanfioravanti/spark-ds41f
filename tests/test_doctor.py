@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import io
+import struct
 import subprocess
 import sys
 import unittest
@@ -522,6 +524,95 @@ class RoceGidTest(unittest.TestCase):
                 "dgx2: RDMA device rocep1s0f1 is missing",
             ],
         )
+
+
+# /proc/buddyinfo summed over zones, 64 KiB pages, as dgx4 reported it on 2026-11-18:
+# up ten days, and a minute after its reboot.
+BUDDY_TEN_DAYS = "3354,5561,5949,5688,4717,3686,2913,2212,1649,829,104,15,0,0"
+BUDDY_FRESH = "143,63,43,39,36,30,17,10,4,5,4,4,2,233"
+
+
+class MemoryBlocksTest(unittest.TestCase):
+    def test_free_memory_by_block_size(self) -> None:
+        free_gib, share, block_mib = spark.free_memory_blocks(facts(buddy=BUDDY_FRESH, page_kb="64"))
+        self.assertEqual(block_mib, 512)
+        self.assertAlmostEqual(free_gib, 118.3, places=1)
+        self.assertGreater(share, 0.94)
+        self.assertEqual(spark.free_memory_blocks(facts(buddy=BUDDY_TEN_DAYS, page_kb="64"))[1], 0.0)
+
+    def test_fresh_node_passes(self) -> None:
+        self.assertEqual(
+            spark.memory_block_warnings("dgx4", facts(buddy=BUDDY_FRESH, page_kb="64", gpu_apps="0")), []
+        )
+
+    def test_idle_node_without_large_blocks_warns(self) -> None:
+        warnings = spark.memory_block_warnings("dgx1", facts(buddy=BUDDY_TEN_DAYS, page_kb="64", gpu_apps="0"))
+        self.assertEqual(len(warnings), 1)
+        self.assertIsInstance(warnings[0], spark.Warn)
+        self.assertIn("dgx1: 0% of the 106 GiB free is in 512 MiB blocks", warnings[0])
+        self.assertIn("--stream-rate", warnings[0])
+
+    def test_node_whose_gpu_is_held_is_not_judged(self) -> None:
+        # A serving engine holds most of the memory: what is left says nothing.
+        self.assertEqual(
+            spark.memory_block_warnings("dgx1", facts(buddy="900,400,90,20,4,0,0,0,0,0,0,0,0,0", page_kb="64", gpu_apps="1")),
+            [],
+        )
+
+    def test_little_free_memory_is_not_judged(self) -> None:
+        self.assertEqual(
+            spark.memory_block_warnings("dgx1", facts(buddy="900,400,90,20,4,0,0,0,0,0,0,0,0,0", page_kb="64", gpu_apps="0")),
+            [],
+        )
+
+    def test_unreadable_blocks_warn(self) -> None:
+        for changes in ({"buddy": "", "page_kb": "64"}, {"buddy": "1,2,3", "page_kb": ""}, {"buddy": "0,0,0", "page_kb": "4"}):
+            warnings = spark.memory_block_warnings("dgx2", facts(gpu_apps="0", **changes))
+            self.assertEqual(warnings, ["dgx2: cannot read free memory by block size (/proc/buddyinfo)"])
+
+    def test_query_reads_the_blocks_and_the_gpus_processes(self) -> None:
+        for needle in ("/proc/buddyinfo", "getconf PAGESIZE", "--query-compute-apps=pid"):
+            self.assertIn(needle, spark.HOST_FACTS_QUERY)
+
+
+class StreamRateTest(unittest.TestCase):
+    def test_fast_node_is_printed_without_a_warning(self) -> None:
+        line, warnings = spark.stream_rate_findings("dgx4", 'noise\n{"stream_gbs": 253.6}\n')
+        self.assertEqual(line, "dgx4: memory reads at 253.6 GB/s")
+        self.assertEqual(warnings, [])
+
+    def test_slow_node_warns(self) -> None:
+        line, warnings = spark.stream_rate_findings("dgx1", '{"stream_gbs": 235.8}')
+        self.assertEqual(line, "dgx1: memory reads at 235.8 GB/s")
+        self.assertEqual(len(warnings), 1)
+        self.assertIsInstance(warnings[0], spark.Warn)
+        self.assertIn("below 245", warnings[0])
+
+    def test_skipped_node_is_reported_without_a_warning(self) -> None:
+        line, warnings = spark.stream_rate_findings("dgx2", '{"skipped": "a process holds the GPU"}')
+        self.assertEqual(line, "dgx2: memory read not measured (a process holds the GPU)")
+        self.assertEqual(warnings, [])
+
+    def test_failed_probe_warns_with_its_last_line(self) -> None:
+        line, warnings = spark.stream_rate_findings("dgx3", "", "docker: Error response from daemon: no such image")
+        self.assertEqual(line, "dgx3: memory read not measured")
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("no such image", warnings[0])
+
+    def test_script_skips_a_held_gpu_and_runs_the_profiles_image(self) -> None:
+        script = spark.stream_rate_script("spark-ds41f:candidate-60")
+        self.assertIn("--query-compute-apps=pid", script)
+        self.assertIn("flock -n 9", script)
+        self.assertIn("/tmp/spark-lab-gpu.lock", script)
+        self.assertIn("--entrypoint python3 spark-ds41f:candidate-60 -c", script)
+        self.assertLess(script.index("flock -n 9"), script.index("docker run"))
+
+    def test_stream_rate_needs_live(self) -> None:
+        args = mock.Mock(live=False, stream_rate=True, fragmentation_commands=False, cluster_config=None)
+        with mock.patch.object(spark.doctor, "configuration", return_value=({}, {}, {})), \
+                mock.patch.object(spark.doctor, "cluster_config_path", return_value=("x", "x")):
+            with self.assertRaises(SystemExit):
+                spark.command_doctor(args)
 
 
 class ClockLatchTest(unittest.TestCase):
@@ -1117,6 +1208,104 @@ class GLPTest(unittest.TestCase):
                                     "ssh: connect to host dgx2 port 22: Connection refused"])
 
 
+class GLPReaderTest(unittest.TestCase):
+    """On the head, the profile image's own GLP reader reads the file as the engine mounts it."""
+
+    GLP, SHA256 = GLPTest.GLP, GLPTest.SHA256
+    IMAGE = "spark-ds41f:1107"
+    READER = ("docker", "run", "--rm", "--pull=never", "--network=none",
+              "--entrypoint=/usr/bin/timeout", "--volume", f"{GLP}:/glp/vector.gguf:ro", IMAGE,
+              "--signal=TERM", "--kill-after=10s", "120s",
+              "python3", "-m", "vllm.models.deepseek_v4_1.glp", "/glp/vector.gguf")
+    SPEC_V3 = {"glp.mode": "project", "glp.spec_version": 3, "glp.hook_point": "hc_fold_pre_engram"}
+    REFUSAL = ("Traceback (most recent call last):\n"
+               '  File "<frozen runpy>", line 198, in _run_module_as_main\n'
+               "ValueError: /glp/vector.gguf: glp.spec_version is 3; this reader implements "
+               "version 1 (rank 1, no alpha scaling keys)\n")
+
+    @staticmethod
+    def gguf(fields: dict) -> bytes:
+        """A GGUF header with these keys (an int as uint32, a str as a string) and no tensors."""
+        def string(text: str) -> bytes:
+            return struct.pack("<Q", len(text.encode())) + text.encode()
+        body = b"".join(string(key) + (struct.pack("<II", 4, value) if isinstance(value, int)
+                                       else struct.pack("<I", 8) + string(value))
+                        for key, value in fields.items())
+        return b"GGUF" + struct.pack("<IQQ", 3, 0, len(fields)) + body
+
+    def head(self, returncode: int, stderr: str = "", header: bytes = b"",
+             digest: str = SHA256) -> tuple[list[str], list[tuple]]:
+        cluster = GLPTest().cluster()
+        cluster["container"]["image"] = self.IMAGE
+        calls = []
+
+        def run_ssh(nodes, node, *argv):
+            calls.append(argv)
+            if argv[0] == "sha256sum":
+                return subprocess.CompletedProcess(argv, 0, f"{digest}  {self.GLP}\n", "")
+            if argv[0] == "docker":
+                return subprocess.CompletedProcess(argv, returncode, "", stderr)
+            return subprocess.CompletedProcess(argv, 0, base64.b64encode(header).decode(), "")
+
+        with mock.patch.object(spark, "run_ssh", run_ssh):
+            problems = spark.node_glp_problems(cluster, {}, {"name": "dgx1", "head": True})
+        return problems, calls
+
+    def test_a_vector_the_image_reads_passes(self) -> None:
+        problems, calls = self.head(0)
+        self.assertEqual(problems, [])
+        self.assertEqual(calls, [("sha256sum", self.GLP), self.READER])
+        self.assertFalse(any(argument.startswith("--gpus") for argument in calls[1]))
+
+    def test_a_vector_the_image_refuses_is_reported_with_its_spec_and_hook(self) -> None:
+        problems, calls = self.head(1, self.REFUSAL, self.gguf(self.SPEC_V3))
+        self.assertEqual(len(problems), 1)
+        self.assertTrue(problems[0].startswith(
+            f"dgx1: {self.IMAGE} cannot read the GLP steering file {self.GLP} "
+            "(glp.spec_version 3, glp.hook_point 'hc_fold_pre_engram'): ValueError: "
+            "/glp/vector.gguf: glp.spec_version is 3; this reader implements version 1"))
+        self.assertIn("would not start, the stock model name included", problems[0])
+        self.assertEqual(calls[2], ("sh", "-c", f"head -c 65536 {self.GLP} | base64 -w0"))
+
+    def test_a_refusal_without_readable_metadata_still_fails(self) -> None:
+        problems, _ = self.head(1, "ValueError: /glp/vector.gguf: not a GGUF file\n", b"\0" * 64)
+        self.assertIn("(its GGUF metadata is unreadable): ValueError", problems[0])
+        problems, _ = self.head(1, "ValueError: boom\n", self.gguf({"glp.mode": "project"}))
+        self.assertIn("(no glp.spec_version, no glp.hook_point): ValueError: boom", problems[0])
+
+    def test_an_image_the_head_lacks_is_left_to_the_image_checks(self) -> None:
+        problems, calls = self.head(125, f"docker: Error response from daemon: No such image: {self.IMAGE}.\n")
+        self.assertEqual(problems, [])
+        self.assertEqual(calls, [("sha256sum", self.GLP), self.READER])
+
+    def test_a_reader_that_cannot_run_or_finish_is_reported(self) -> None:
+        problems, _ = self.head(127, "/usr/bin/timeout: failed to run command 'python3': No such file or directory\n")
+        self.assertEqual(problems, [f"dgx1: cannot run {self.IMAGE}'s GLP reader: /usr/bin/timeout: "
+                                    "failed to run command 'python3': No such file or directory"])
+        problems, _ = self.head(125, "docker: Error response from daemon: invalid mount config\n\n"
+                                     "Run 'docker run --help' for more information\n")
+        self.assertEqual(problems, [f"dgx1: cannot run {self.IMAGE}'s GLP reader: "
+                                    "docker: Error response from daemon: invalid mount config"])
+        problems, _ = self.head(124)
+        self.assertEqual(problems, [f"dgx1: {self.IMAGE}'s GLP reader did not finish within 120s"])
+
+    def test_only_the_head_runs_the_reader_and_only_on_the_pinned_file(self) -> None:
+        problems, calls = self.head(1, self.REFUSAL, digest="0" * 64)
+        self.assertIn("not glp.sha256", problems[0])
+        self.assertEqual(calls, [("sha256sum", self.GLP)])
+
+    def test_metadata_is_read_as_far_as_the_bytes_reach(self) -> None:
+        header = self.gguf({"glp.spec_version": 1, "glp.hook_point": "residual_stream_post_layer"})
+        self.assertEqual(spark.gguf_metadata(header),
+                         {"glp.spec_version": 1, "glp.hook_point": "residual_stream_post_layer"})
+        self.assertEqual(spark.gguf_metadata(header[:-4]), {"glp.spec_version": 1})
+        array = (b"GGUF" + struct.pack("<IQQ", 3, 0, 1) + struct.pack("<Q", 10) + b"glp.layers"
+                 + struct.pack("<IIQ", 9, 5, 2) + struct.pack("<ii", 11, 37))
+        self.assertEqual(spark.gguf_metadata(array), {"glp.layers": [11, 37]})
+        with self.assertRaisesRegex(ValueError, "not a GGUF file"):
+            spark.gguf_metadata(b"GGML")
+
+
 class NewUserOnboardingTest(unittest.TestCase):
     def test_missing_node_map_prints_setup_guidance_for_each_shape(self) -> None:
         general = spark.missing_nodes_message()
@@ -1178,6 +1367,25 @@ class NewUserOnboardingTest(unittest.TestCase):
         errors = spark.topology.problems(cluster, nodes)
         self.assertTrue(any("ssh_host is no longer used because name is now the SSH target" in e for e in errors))
         self.assertFalse(any("unknown fields" in e for e in errors))
+
+    def test_local_tp1_topology_problems(self) -> None:
+        import copy
+
+        cluster = spark.read_cluster("experiments/2026-11-16-c61-decode/tp1.json")
+        nodes = spark.read_json("config/examples/nodes-tp1.json")
+        cluster["distributed"]["master_addr"] = nodes["nodes"][0]["management_ip"]
+        self.assertEqual(spark.topology.problems(cluster, nodes), [])
+        self.assertEqual(spark.topology.hcas(cluster, nodes["nodes"][0]), [])
+
+        two_nodes = copy.deepcopy(nodes)
+        two_nodes["nodes"].append({"name": "spark-2", "rank": 1, "management_ip": "192.0.2.2", "head": False})
+        errors = spark.topology.problems(cluster, two_nodes)
+        self.assertTrue(any("local deployment requires 1 node, got 2" in e for e in errors))
+
+        with_sparknet = copy.deepcopy(cluster)
+        with_sparknet["environment"]["SPARKNET_ROCE_TIMEOUT_MS"] = "10000"
+        errors = spark.topology.problems(with_sparknet, nodes)
+        self.assertTrue(any("local does not run sparknet; SPARKNET_ROCE_* settings do not apply" in e for e in errors))
 
     def test_docker_permission_denied_points_to_docker_group(self) -> None:
         stderr = (
@@ -1299,6 +1507,125 @@ class IdentifierAlignmentTest(unittest.TestCase):
         lock_problems = spark.source_identifier_problems(stale_lock, stale_manifest)
         self.assertTrue(any("lock expected_tree" in p for p in lock_problems))
         self.assertTrue(any("patch_count is 512" in p for p in lock_problems))
+
+
+class QualifiedRecipeProblemsTest(unittest.TestCase):
+    def _nodes(self, shape: str) -> dict:
+        example_by_shape = {
+            "tp4-ring": "config/examples/nodes-ring4.json",
+            "tp4-switched": "config/examples/nodes-switched.json",
+            "tp3-triangle": "config/nodes.example.json",
+            "tp3-triangle-4k": "config/nodes.example.json",
+            "tp3-switched": "config/examples/nodes-switched3.json",
+            "tp5-switched": "config/examples/nodes-switched5.json",
+            "tp6-switched": "config/examples/nodes-switched6.json",
+            "tp7-switched": "config/examples/nodes-switched7.json",
+            "tp8-switched": "config/examples/nodes-switched8.json",
+        }
+        return spark.read_json(example_by_shape[shape])
+
+    def test_canonical_production_and_candidate_profiles_pass_cleanly(self) -> None:
+        prod_lock = spark.read_json("upstreams.lock.json")
+        for shape in (
+            "tp4-ring", "tp4-switched", "tp3-triangle", "tp3-switched",
+            "tp3-triangle-4k", "tp5-switched", "tp6-switched", "tp7-switched", "tp8-switched",
+        ):
+            with self.subTest(config="production", shape=shape):
+                cluster = spark.read_cluster("config/cluster.json", shape)
+                self.assertEqual(spark.qualified_recipe_problems(cluster, self._nodes(shape), prod_lock), [])
+
+        c55_lock = spark.read_json("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/upstreams.lock.json")
+        stem_to_shape = {"tp4": "tp4-ring", "tp3": "tp3-triangle"}
+        for base in (
+            "experiments/2026-10-26-spark-ds41f-candidate/candidate-55",
+            "experiments/2026-11-14-c58-prefill-10k",
+            "experiments/2026-11-15-c59-prefill",
+        ):
+            for stem in ("tp4", "tp4-switched", "tp3", "tp3-switched", "tp5-switched"):
+                with self.subTest(base=base, stem=stem):
+                    cluster = spark.read_cluster(f"{base}/{stem}.json")
+                    dev = spark.read_cluster(f"{base}/{stem}-dev.json")
+                    nodes = self._nodes(stem_to_shape.get(stem, stem))
+                    self.assertEqual(spark.qualified_recipe_problems(cluster, nodes, c55_lock), [])
+                    self.assertEqual(spark.qualified_recipe_problems(dev, nodes, c55_lock), [])
+                    if base != "experiments/2026-10-26-spark-ds41f-candidate/candidate-55":
+                        # Without site nodes-switched*.local.json, validate topology/recipe checks via example nodes.
+                        dev["distributed"]["master_addr"] = nodes["nodes"][0]["management_ip"]
+                        with unittest.mock.patch.object(spark, "tracked_secret_problems", return_value=[]):
+                            findings = spark.local_doctor(dev, nodes, c55_lock)
+                        self.assertEqual(findings, [])
+
+    def test_unset_or_wrong_l2_prefetch_budgets_warn_without_15_12_12_overlay(self) -> None:
+        import copy
+
+        c55_lock = spark.read_json("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/upstreams.lock.json")
+        base_tp4 = spark.read_cluster("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/tp4.json")
+        nodes = self._nodes("tp4-ring")
+
+        unset_tp4 = copy.deepcopy(base_tp4)
+        for key in ("VLLM_DS41_L2_PREFETCH_WO_MB", "VLLM_DS41_L2_PREFETCH_FFN_MB", "VLLM_DS41_L2_PREFETCH_NEXT_MB"):
+            unset_tp4["environment"].pop(key)
+        warnings = spark.qualified_recipe_problems(unset_tp4, nodes, c55_lock)
+        self.assertEqual(len(warnings), 3)
+        self.assertTrue(all(isinstance(w, spark.Warn) for w in warnings))
+        self.assertTrue(any("VLLM_DS41_L2_PREFETCH_WO_MB is unset" in w for w in warnings))
+
+        stale_tp4 = copy.deepcopy(base_tp4)
+        stale_tp4["environment"]["VLLM_DS41_L2_PREFETCH_WO_MB"] = "20"
+        stale_tp4["environment"]["VLLM_DS41_L2_PREFETCH_FFN_MB"] = "16"
+        stale_tp4["environment"]["VLLM_DS41_L2_PREFETCH_NEXT_MB"] = "20"
+        warnings = spark.qualified_recipe_problems(stale_tp4, nodes, c55_lock)
+        self.assertEqual(len(warnings), 3)
+        self.assertTrue(any("VLLM_DS41_L2_PREFETCH_WO_MB='20', expected qualified '15'" in w for w in warnings))
+
+        # C58/C59 mount l2_prefetch.py with 15/12/12 defaults, so unsetting the env vars is clean.
+        overlaid = spark.read_cluster("experiments/2026-11-14-c58-prefill-10k/tp4.json")
+        for key in ("VLLM_DS41_L2_PREFETCH_WO_MB", "VLLM_DS41_L2_PREFETCH_FFN_MB", "VLLM_DS41_L2_PREFETCH_NEXT_MB"):
+            overlaid["environment"].pop(key)
+        self.assertEqual(spark.qualified_recipe_problems(overlaid, nodes, c55_lock), [])
+
+    def test_missing_or_wrong_wo_bands_and_roce_cutoff_warn(self) -> None:
+        import copy
+
+        c55_lock = spark.read_json("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/upstreams.lock.json")
+        noband = spark.read_cluster("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/tp4-noband.json")
+        warnings = spark.qualified_recipe_problems(noband, self._nodes("tp4-ring"), c55_lock)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("VLLM_DS41_L2_PREFETCH_WO_BANDS=None, expected qualified '17-32=10'", warnings[0])
+
+        tp3 = spark.read_cluster("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/tp3-switched.json")
+        wrong_tp3 = copy.deepcopy(tp3)
+        wrong_tp3["environment"]["VLLM_DS41_L2_PREFETCH_WO_BANDS"] = "17-32=10"
+        wrong_tp3["environment"].pop("SPARKNET_ROCE_MAX_COLLECTIVE_BYTES")
+        warnings = spark.qualified_recipe_problems(wrong_tp3, self._nodes("tp3-switched"), c55_lock)
+        self.assertEqual(len(warnings), 2)
+        self.assertTrue(any("WO_BANDS='17-32=10', expected qualified '17-32=12'" in w for w in warnings))
+        self.assertTrue(any("SPARKNET_ROCE_MAX_COLLECTIVE_BYTES=None, expected qualified '4194304'" in w for w in warnings))
+
+        tp4 = spark.read_cluster("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/tp4.json")
+        wrong_tp4 = copy.deepcopy(tp4)
+        wrong_tp4["environment"]["SPARKNET_ROCE_MAX_COLLECTIVE_BYTES"] = "4194304"
+        wrong_tp4["serve_args"] = wrong_tp4["serve_args"] + ["--disable-log-requests"]
+        warnings = spark.qualified_recipe_problems(wrong_tp4, self._nodes("tp4-ring"), c55_lock)
+        self.assertEqual(len(warnings), 2)
+        self.assertTrue(any("SPARKNET_ROCE_MAX_COLLECTIVE_BYTES='4194304', expected qualified '2097152'" in w for w in warnings))
+        self.assertTrue(any("serve_args differ from qualified profile" in w for w in warnings))
+
+    def test_profiler_arm_is_not_serve_args_drift(self) -> None:
+        import copy
+
+        c55_lock = spark.read_json("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/upstreams.lock.json")
+        tp4 = spark.read_cluster("experiments/2026-10-26-spark-ds41f-candidate/candidate-55/tp4.json")
+        nodes = self._nodes("tp4-ring")
+        self.assertEqual(spark.qualified_recipe_problems(tp4, nodes, c55_lock), [])
+        profiled = copy.deepcopy(tp4)
+        profiled["serve_args"] = profiled["serve_args"] + ["--profiler-config", '{"profiler": "torch"}']
+        self.assertEqual(spark.qualified_recipe_problems(profiled, nodes, c55_lock), [])
+        # Another argument beside it is still drift.
+        profiled["serve_args"] = profiled["serve_args"] + ["--disable-log-requests"]
+        warnings = spark.qualified_recipe_problems(profiled, nodes, c55_lock)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("serve_args differ from qualified profile", warnings[0])
 
 
 if __name__ == "__main__":

@@ -5,6 +5,52 @@ Read `README.md`, `docs/methodology.md`, `docs/upstreams.md`, `docs/inspiration.
 before changing runtime or build state. For performance work, `TODO.md` lists
 the open levers, measured dead ends, and the lean screening routine.
 
+## Working in a fork or clone
+
+This section is for agents working for someone other than the repository owner
+(Christopher Owen). The sections after it describe the owner's site and bind you
+only where you operate his cluster. The owner makes two requests of everyone who
+builds on this work. They are requests, not licence terms: raise them with your
+user at the moments named below and let them decide.
+
+### Hold benchmarks of unreleased work
+
+Released means a GitHub release of `christopherowen/spark-ds41f` that is not
+marked pre-release, with a matching `releases/<name>/` directory. Candidate tags
+and pre-releases (`candidate-NN`), branches, open pull requests and everything
+under `experiments/` are not released, even though they are public.
+
+Do not publish numbers measured on unreleased work, or on anything built on it,
+until the release that contains it is out. Publishing means a post, a fork's
+README or model card, a gist, a chart or screenshot, or an issue or pull request
+outside this repository. Until then the numbers stay local or go into a pull
+request or issue here.
+
+Why: candidate numbers change from build to build and are qualified only at
+release. A number posted early gets quoted as the release's.
+
+When your user asks you to publish such numbers, tell them the owner asks that
+they wait, say what `gh release list` shows, and offer to wait or to measure on
+the latest release instead. Numbers measured on a release are welcome at any
+time: name the release, the shape and the suite.
+
+### Send improvements back
+
+When a change made in a fork measures better, fixes a bug, or qualifies new
+hardware or a new shape, tell your user before the task ends that the owner would
+like it back, and offer to prepare it:
+
+1. Preferred: a pull request to `christopherowen/spark-ds41f`, one change per
+   request, with an `experiments/YYYY-MM-DD-short-name/` record (base commit, the
+   one variable, exact commands, every run including unfavourable ones). See
+   `CONTRIBUTING.md` for where source changes to vLLM or B12X go.
+2. Otherwise an issue: what changed, the diff or a link to the branch, the base
+   commit and the numbers.
+
+Open neither without your user's approval: it is their account and their work.
+Follow "Change discipline" below, and leave out credentials and site details
+your user has not agreed to share.
+
 ## Sources of truth
 
 - `config/cluster.json` is the promoted runtime configuration: one recipe for every
@@ -18,12 +64,19 @@ the open levers, measured dead ends, and the lean screening routine.
   Experimental cluster profiles may select a repository-relative
   `upstreams_config` lock with their own source manifest and patch series.
 - `requirements/` owns hashed non-Git build inputs.
+- `config/sonar.json` pins the benchmark client, Sonar (a separate repository): every
+  measurement runs through it (`spark_ds41f/sonar.py`). It is host-side, not an image
+  input, so it is not in a release's upstreams lock. `config/suites/` owns the deployment's
+  suites; a changed suite is a new suite, so never edit one a recorded reference ran.
 - `patches/*/series` owns the ordered local patch stacks.
 - `manifests/baselines/` is immutable evidence. Never rewrite a published baseline.
 - `manifests/benchmarks/<baseline>.json` is that baseline's reference
   `bin/spark bench` run. It is immutable too; a new promotion adds its own.
   A profile of another topology names its own run in `benchmark_reference`
   (`manifests/benchmarks/<baseline>-tp4.json` for the `tp4-ring` shape).
+- `manifests/frozen/candidate-<N>.json` records a frozen candidate: a verified merged base published as
+  the GitHub pre-release `candidate-<N>` (docs/release-benchmark.md, "Frozen candidates").
+  It is immutable, and so are its tag and its candidate folder; a later freeze adds its own.
 - `experiments/` is the only place for unpromoted tuning.
 - `docs/inspiration.md` is a research watchlist, never a source or deployment
   authority. It names each source, what to review it for, and the adoption
@@ -42,6 +95,9 @@ differences into this repository.
 Use neutral task names for branches, commits, pull requests and documentation.
 Do not add agent or tool attribution, including branch prefixes or commit trailers.
 Preserve required third-party license notices.
+
+Candidate rounds (several candidates at once, PR selection, marks, rework and
+carrying winners forward) follow `docs/release-benchmark.md` (Candidates).
 
 Create `experiments/YYYY-MM-DD-short-name/` for performance work. Record the base
 commit, one intended variable, exact commands, workload identity, all runs, errors,
@@ -69,6 +125,9 @@ node at that exact commit. `cluster sync` also copies the profile's image from t
 head to every node that lacks it. A `cluster start` plan runs the full preflight; when
 a node differs from the head, it ends with the `cluster sync --apply` that repairs it.
 Do not bypass the coordinated start with a one-rank launch script.
+Use `bin/spark cache status` and `cache clear` to inspect and clear the nodes' JIT caches,
+not ad-hoc SSH: `clear` is a plan unless `--apply`, which needs the engine stopped and
+`--cluster-config` named.
 
 ## Shared cluster windows
 
@@ -90,6 +149,17 @@ Coordinate through `~/spark-hold.json` on dgx1:
 Inside a window, run jobs back to back without restoring the promoted service in
 between; restore it once, when the window closes. See `docs/lab.md`.
 
+Existing groups with disjoint physical nodes may run concurrently under explicit
+pool reservations. Each reservation must name its nodes, exact holder and token,
+published controller, restore profile and commit, and independent restoration
+watchdog. Check the dgx1 hold and every participating node's hold before acting.
+An unscoped hold remains global: only its holder may record a verified node scope;
+never infer an exemption from an idle GPU or an absent local hold. The coordinator
+records the disjoint allocations in `~/spark-coordination.json` on dgx1, which is
+scheduling advice and grants no lease. Keep earlier requests attached to their
+claimed pool. Do not share a node, GPU, serving group, or timing cohort between
+owners, and restore every node in a serving group together before releasing it.
+
 ## Upstream work
 
 Never make durable changes in exported vLLM or B12X trees. Start from the commit in
@@ -107,6 +177,24 @@ Each local patch must state its upstream base, rationale, quality implications,
 tests, and upstream status. Prefer a narrowly scoped patch that can become one
 upstream commit. When upstream accepts a change, replace the local patch with the
 new upstream commit pin rather than carrying both.
+
+## Work location and disk use
+
+Keep the Mac for lightweight source editing, Git review, documentation, and small
+evidence files. Run upstream preparation, dependency installation, compilation,
+image builds, tests, and bulk downloads on the DGX or Spaceports, using published
+Git revisions and task-specific scratch paths. Check remote free space before
+starting and remove unused, regenerable artifacts after the work is preserved.
+
+Do not accumulate local prepared trees, build contexts, dependency caches, image
+archives, or bulk run outputs. Fetch only the Git refs needed for a task; avoid
+repeated broad fetches into the shared checkout. Clean up only confirmed unused
+temporary files and disposable artifacts. Preserve source changes, experiment
+evidence, active files, model weights, credentials, and other tasks' data.
+Before removing a source tree, check its registered worktrees and shared Git
+object storage; keep any Git database or alternates target another checkout uses.
+
+Remote work still follows the shared cluster window and deployment rules above.
 
 ## Safety and secrets
 

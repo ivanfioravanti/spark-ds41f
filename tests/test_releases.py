@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import recipe  # noqa: E402
 import render_docs  # noqa: E402
-from test_recipe import RENDERED, host_mounts, load_spark  # noqa: E402
+from test_recipe import RENDERED, REPORTING_ARGS, host_mounts, load_spark  # noqa: E402
 
 # What names a configuration rather than what it serves.
 NAMING = ("promoted_baseline", "upstreams_config", "benchmark_reference", "shape", "notes")
@@ -80,7 +80,7 @@ class ReleaseTest(unittest.TestCase):
             self.assertIn(manifest["benchmark_reference"], references, name)
 
     def test_production_is_the_newest_release(self):
-        """The newest release's copies plus explicitly recorded image-admission defaults."""
+        """The newest release's copies plus explicitly recorded image-admission and reporting defaults."""
         production = load("config/cluster.json")
         manifest = self.releases[production["promoted_baseline"]]
         self.assertEqual(max(self.releases, key=lambda n: self.releases[n]["captured_at"]),
@@ -91,11 +91,12 @@ class ReleaseTest(unittest.TestCase):
             self.assertIn(change["baseline"], self.releases)
             self.assertTrue(change["reason"])
             self.assertTrue(change["qualification"])
+            self.assertTrue(change.get("serve_options") or change.get("serve_flags_added"))
             if change["baseline"] != production["promoted_baseline"]:
                 continue
-            for flag, values in change["serve_options"].items():
-                # Defaults may change admission limits, never silently replace
-                # a released model, image, source lock or numerical setting.
+            for flag, values in change.get("serve_options", {}).items():
+                # Defaults may change admission limits or reporting flags, never
+                # silently replace a released model, image, source lock or numerical setting.
                 self.assertEqual(flag, "--limit-mm-per-prompt")
                 self.assertEqual(set(json.loads(values["after"])), {"image"})
                 count = json.loads(values["after"])["image"]
@@ -104,6 +105,12 @@ class ReleaseTest(unittest.TestCase):
                 index = frozen["serve_args"].index(flag) + 1
                 self.assertEqual(frozen["serve_args"][index], values["before"])
                 frozen["serve_args"][index] = values["after"]
+            for entry in change.get("serve_flags_added", []):
+                flag = entry["flag"]
+                self.assertIn(flag, REPORTING_ARGS)
+                self.assertNotIn(flag, frozen["serve_args"])
+                after_index = frozen["serve_args"].index(entry["after"])
+                frozen["serve_args"].insert(after_index + 1, flag)
         self.assertEqual({k: v for k, v in production.items() if k != "upstreams_config"},
                          {k: v for k, v in frozen.items() if k != "upstreams_config"})
         self.assertNotIn("upstreams_config", production)
@@ -122,7 +129,12 @@ class ReleaseTest(unittest.TestCase):
 
         data = render_docs.collect_manifest_data()
         production = load("config/cluster.json")
+        upstreams_lock = load("upstreams.lock.json")
         self.assertEqual(data["promoted_baseline"], production["promoted_baseline"])
+        self.assertEqual(
+            [u["patch_count"] for u in data["upstreams"] if u["name"] == "vllm"],
+            [upstreams_lock["sources"]["vllm"]["patch_count"]],
+        )
         self.assertEqual(
             [s["name"] for s in data["shapes"]],
             list(production["shapes"].keys()),
@@ -152,6 +164,8 @@ class ReleaseTest(unittest.TestCase):
             site_data = json.loads((site_dir / "data.json").read_text())
             self.assertEqual(site_data["promoted_baseline"], production["promoted_baseline"])
             html_text = (site_dir / "index.html").read_text()
+            self.assertNotIn("__SPARK_RANGE__", html_text)
+            self.assertIn("one to eight DGX Sparks", html_text)
             match = re.search(
                 r'<script id="manifest-data" type="application/json">\s*(.*?)\s*</script>',
                 html_text,
@@ -161,6 +175,22 @@ class ReleaseTest(unittest.TestCase):
             embedded = json.loads(match.group(1))
             self.assertEqual(embedded["promoted_baseline"], production["promoted_baseline"])
             self.assertEqual(len(embedded["suites"]), len(suite_dirs))
+            self.assertIn("benchmarks", embedded)
+            bench_by_path = {b["path"]: b for b in embedded["benchmarks"]}
+            suite_by_path = {s["path"]: s for s in embedded["suites"]}
+            suite_by_id = {s["id"]: s for s in embedded["suites"]}
+            for s in embedded["shapes"]:
+                ref = s.get("benchmark_reference")
+                if ref and ref.endswith(".json"):
+                    self.assertIn(ref, bench_by_path, s["name"])
+                rec = (
+                    suite_by_path.get(ref)
+                    or suite_by_id.get(f"{embedded['promoted_baseline']}-{s['name']}")
+                    or bench_by_path.get(ref)
+                )
+                self.assertIsNotNone(rec, f"missing site benchmark/suite for {s['name']}")
+                self.assertIn("c1", rec["runs"], s["name"])
+                self.assertTrue(rec["prefill"], f"missing prefill points for {s['name']}")
 
 
 if __name__ == "__main__":

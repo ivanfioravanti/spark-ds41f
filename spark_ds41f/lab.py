@@ -73,12 +73,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 import spark_ds41f as spark
-from spark_ds41f import functional_evidence
+from spark_ds41f import functional_evidence, sonar
 _agentx_loader = importlib.machinery.SourceFileLoader("agentx", str(ROOT / "scripts" / "agentx.py"))
 agentx = importlib.util.module_from_spec(importlib.util.spec_from_loader("agentx", _agentx_loader))
 _agentx_loader.exec_module(agentx)
 
 HOLD = Path.home() / "spark-hold.json"
+HOLD_LOCK = Path.home() / "spark-hold.lock"
+_DEFAULT_HOLD = HOLD
+_DEFAULT_HOLD_LOCK = HOLD_LOCK
 LAB_HOME = Path.home() / "spark-lab"
 REQUEST = Path.home() / "spark-request.json"
 # The names before the project was renamed from spark3: a hold or request an
@@ -100,29 +103,33 @@ TRACE_LOG_DIR = "/cache/spark-ds41f/moe-checksums"
 GPU_CLOCKS_MARKER = LAB_HOME / "gpu-clocks-locked.json"
 
 # Measurement profiles: (script, extra arguments, output stem). The bench command is built apart.
+# Every script is a Sonar command (spark_ds41f/sonar.py); their requests are those of the
+# experiment scripts they replaced (experiments/2026-09-29-determinism, 2026-10-09's
+# token_determinism.py), so earlier profile runs compare with new ones.
 PROFILES = {
     "full": {
         "bench": ["--min-samples", "5", "--max-samples", "5", "--prefill-sizes", "1024,4096,16384,65536",
                   "--prefill-repeats", "3"],
-        "extras": [("c1_distinct.py", ["--tokens", "256"], "c1-distinct"),
-                   ("c8_distinct.py", ["--samples", "3", "--tokens", "256"], "c8-distinct"),
-                   ("ttft_short.py", [], "ttft"),
-                   ("mixed_latency.py", ["--rounds", "3"], "mixed")],
+        "extras": [("scripts/sonar_single.py", ["--tokens", "256"], "c1-distinct"),
+                   ("scripts/distinct_streams.py", ["--streams", "8", "--samples", "3", "--tokens", "256"],
+                    "c8-distinct"),
+                   ("scripts/sonar_ttft.py", [], "ttft"),
+                   ("scripts/sonar_mixed.py", ["--rounds", "3"], "mixed")],
     },
     "lean": {
         "bench": ["--min-samples", "3", "--max-samples", "3", "--prefill-sizes", "1024,16384",
                   "--prefill-repeats", "2"],
-        "extras": [("c1_distinct.py", ["--tokens", "256", "--prompts", "12"], "c1-distinct"),
-                   ("c8_distinct.py", ["--samples", "2", "--tokens", "256"], "c8-distinct"),
-                   ("ttft_short.py", ["--reps", "3"], "ttft"),
-                   ("mixed_latency.py", ["--rounds", "3"], "mixed")],
+        "extras": [("scripts/sonar_single.py", ["--tokens", "256", "--prompts", "12"], "c1-distinct"),
+                   ("scripts/distinct_streams.py", ["--streams", "8", "--samples", "2", "--tokens", "256"],
+                    "c8-distinct"),
+                   ("scripts/sonar_ttft.py", ["--reps", "3"], "ttft"),
+                   ("scripts/sonar_mixed.py", ["--rounds", "3"], "mixed")],
     },
 }
 # The release comparison (docs/lab.md, "Release comparison"): the previous release and
 # the candidate in one session, with the same workloads every release.
 # scripts/release_table.py writes the over/under table.
-_DETERMINISM = "experiments/2026-10-09-tilelang-migration/token_determinism.py"
-_LATENCY = "experiments/2026-09-29-determinism"
+_DETERMINISM = "scripts/sonar_determinism.py"
 PROFILES["release"] = {
     "bench_args": ["--suites", "quality,decode,prefill", "--min-samples", "5", "--max-samples", "10",
                    "--precision", "2", "--concurrency", "1,2,4,8,16", "--decode-cases", "prose,code",
@@ -131,11 +138,11 @@ PROFILES["release"] = {
     "extras": [(_DETERMINISM, ["--tokens", "192", "--long-lines", "700", "--wide"], "determinism"),
                ("scripts/acceptance_sweep.py", ["--tokens", "256"], "sweep"),
                # One stream: twelve prompts one at a time (distinct_streams.py --streams 1 is one prompt).
-               (f"{_LATENCY}/c1_distinct.py", ["--tokens", "256", "--prompts", "12"], "c1-distinct"),
+               ("scripts/sonar_single.py", ["--tokens", "256", "--prompts", "12"], "c1-distinct"),
                *[("scripts/distinct_streams.py", ["--streams", str(n), "--samples", str(s), "--tokens", "256"],
                   f"c{n}-distinct") for n, s in ((4, 3), (8, 4), (16, 4))],
-               (f"{_LATENCY}/ttft_short.py", ["--reps", "3"], "ttft"),
-               (f"{_LATENCY}/mixed_latency.py", ["--rounds", "3"], "mixed")],
+               ("scripts/sonar_ttft.py", ["--reps", "3"], "ttft"),
+               ("scripts/sonar_mixed.py", ["--rounds", "3"], "mixed")],
     "table": "scripts/release_table.py",
 }
 # TP3's recipe limits: eight streams, 1M context (sizes below max-model-len - 64).
@@ -170,7 +177,9 @@ def parse_time(text: str) -> float:
 
 
 def write_json_atomic(path: Path, data: dict) -> None:
-    temporary = path.with_name(path.name + ".tmp")
+    # One temporary per concurrent writer: a runner's foreground beat() and its background
+    # heartbeat can write the hold at the same moment.
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     os.replace(temporary, path)
 
@@ -183,12 +192,64 @@ def nodes_config() -> dict:
     return production_configuration()[1]
 
 
-def head_url() -> str:
-    head = next(node for node in nodes_config()["nodes"] if node["head"])
-    return f"http://{head['management_ip']}:8000"
+def serving_port(cluster: dict) -> str:
+    """The port a profile serves on: its last ``--port`` serving argument, in either form,
+    else vLLM's default."""
+    port, args = "8000", [str(arg) for arg in cluster.get("serve_args", [])]
+    for index, arg in enumerate(args):
+        if arg == "--port" and index + 1 < len(args):
+            port = args[index + 1]
+        elif arg.startswith("--port="):
+            port = arg.partition("=")[2]
+    return port
+
+
+def head_url(config: str | None = None) -> str:
+    """The head's serving URL under ``config`` (default: the production profile)."""
+    cluster, nodes, _ = (production_configuration() if config is None
+                         else spark.configuration(argparse.Namespace(cluster_config=config)))
+    head = next(node for node in nodes["nodes"] if node["head"])
+    return f"http://{head['management_ip']}:{serving_port(cluster)}"
+
+
+# A planned script's head URL: an arm may serve on another port than production (docs/lab.md),
+# and its configuration may only arrive with the run's sync, so the URL is resolved when the
+# step runs, from the step's "url_config".
+HEAD_URL = "{head_url}"
+
+
+def step_argv(step: dict) -> list[str]:
+    if HEAD_URL not in step["argv"]:
+        return step["argv"]
+    try:
+        url = head_url(step.get("url_config"))
+    except SystemExit as error:  # a failed step, so the window still closes
+        raise RuntimeError(f"no head URL for {step.get('url_config')}: {error}") from None
+    return [url if arg == HEAD_URL else arg for arg in step["argv"]]
 
 
 # ---------------------------------------------------------------- hold file and guards
+
+def _hold_lock_path() -> Path:
+    if HOLD_LOCK != _DEFAULT_HOLD_LOCK:
+        return HOLD_LOCK
+    if HOLD != _DEFAULT_HOLD:
+        return HOLD.with_suffix(".lock")
+    return HOLD_LOCK
+
+
+@contextlib.contextmanager
+def hold_lock():
+    """Serialize hold-file updates and window_close() across runner, closer and watchdog processes."""
+    lock_path = _hold_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
 
 def read_hold(path: Path | None = None) -> dict | None:
     for candidate in (path,) if path else (HOLD, LEGACY_HOLD):
@@ -245,14 +306,19 @@ def heartbeat_age(hold: dict, at: float | None = None) -> float:
     return at - parse_time(hold["heartbeat"])
 
 
-def beat(note: str | None = None) -> None:
-    hold = read_hold()
-    if not hold_is_ours(hold):
-        raise SystemExit("the hold file is not ours; refusing to continue")
-    hold["heartbeat"] = now()
-    if note:
-        hold["current"] = note
-    write_json_atomic(HOLD, hold)
+def beat(note: str | None = None, *, expected_window: str | None = None) -> None:
+    with hold_lock():
+        hold = read_hold()
+        if not hold_is_ours(hold):
+            raise SystemExit("the hold file is not ours; refusing to continue")
+        if expected_window is not None and hold.get("window") != expected_window:
+            raise SystemExit("the hold file moved to another window; refusing to continue")
+        if hold.get("closing"):
+            raise SystemExit("the window is closing; refusing to continue")
+        hold["heartbeat"] = now()
+        if note:
+            hold["current"] = note
+        write_json_atomic(HOLD, hold)
 
 
 def window_should_close(hold: dict, at: float | None = None) -> str | None:
@@ -334,6 +400,126 @@ def ready_seconds(lines: list[str]) -> float | None:
     return None
 
 
+# The container's kernel caches (TileLang, Triton, vLLM's compile cache, the CUDA JIT cache):
+# host directories under the cache mount, which persist across boots. Files a boot adds are
+# kernels it compiled; an image's first boot on a node compiles its changed kernels (273 and
+# 427 TileLang files in candidate-58's first boots on sp1 and sp5, none in the boots after),
+# which can add over a minute to its time to ready.
+JIT_CACHE_ENVIRONMENT = ("TILELANG_CACHE_DIR", "TRITON_CACHE_DIR", "VLLM_CACHE_ROOT", "CUDA_CACHE_PATH")
+BOOT_LEDGER = "results/private/lab/boot-ledger.jsonl"
+BOOT_PROBE = (
+    'since="$1"; image="$2"; shift 2; '
+    'echo "image $(docker image inspect --format "{{.Id}}" "$image" 2>/dev/null || echo -)"; '
+    'for d in "$@"; do [ -d "$d" ] || continue; '
+    'echo "jit $(find "$d" -type f -newermt "@$since" 2>/dev/null | wc -l) $d"; done'
+)
+
+
+def jit_cache_dirs(cluster: dict) -> list[str]:
+    """The host directories of the container's kernel caches: each cache variable's path in
+    the container mapped back through the container's mounts to a node path."""
+    environment, mounts, out = cluster.get("environment", {}), cluster.get("container", {}).get("mounts", []), []
+    for key in JIT_CACHE_ENVIRONMENT:
+        inside = environment.get(key)
+        if not inside:
+            continue
+        for mount in mounts:
+            source, target = str(mount[0]), str(mount[1]).rstrip("/")
+            if inside == target or inside.startswith(target + "/"):
+                out.append(spark.host_path(cluster, source.rstrip("/") + inside[len(target):]))
+                break
+    return list(dict.fromkeys(out))
+
+
+def parse_boot_probe(text: str) -> dict:
+    image, files = None, {}
+    for line in text.splitlines():
+        kind, _, rest = line.partition(" ")
+        if kind == "image":
+            image = None if rest.strip() in ("", "-") else rest.strip()
+        elif kind == "jit":
+            count, _, path = rest.partition(" ")
+            if count.isdigit():
+                files[Path(path).name] = int(count)
+    return {"image_id": image, "jit_new_files": files}
+
+
+def probe_boot(config: str, since: float) -> dict:
+    """Each node's image ID and the kernel-cache files created since ``since`` (epoch seconds,
+    the start command's time less a little for clock skew). A node that cannot be read is
+    left out; the probe never fails a boot."""
+    try:
+        cluster = spark.read_cluster(config)
+        dirs, image = jit_cache_dirs(cluster), cluster["container"]["image"]
+        nodes = nodes_config()
+    except Exception:  # noqa: BLE001 - an unreadable profile or node map: no record
+        return {}
+
+    def one(node: dict) -> tuple[str, dict | None]:
+        try:
+            done = subprocess.run(
+                ["ssh", *spark.ssh_options(), spark.ssh_target(nodes, node),
+                 shlex.join(["bash", "-c", BOOT_PROBE, "probe", f"{since:.0f}", image, *dirs])],
+                capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL)
+        except Exception:  # noqa: BLE001 - a record only; it never fails the boot
+            return str(node.get("name")), None
+        return node["name"], parse_boot_probe(done.stdout) if done.returncode == 0 else None
+
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(nodes["nodes"]))) as pool:
+            return {name: found for name, found in pool.map(one, nodes["nodes"]) if found is not None}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def mark_first_boots(probe: dict, config: str, ready: float | None, ledger: Path | None = None) -> dict:
+    """Mark each node's boot as the image's first there when the boot ledger (one line a lab
+    boot: time, configuration, ready seconds, each node's image ID and new kernel files) has
+    no earlier boot of that image ID on that node, then append this boot."""
+    if not probe:
+        return probe
+    ledger = ledger or ROOT / BOOT_LEDGER
+    seen = set()
+    try:
+        for line in ledger.read_text().splitlines():
+            try:
+                record = json.loads(line)
+            except ValueError:
+                continue
+            for node, state in (record.get("nodes") or {}).items():
+                if state.get("image_id"):
+                    seen.add((node, state["image_id"]))
+    except OSError:
+        pass
+    for node, state in probe.items():
+        state["first_boot"] = bool(state.get("image_id")) and (node, state["image_id"]) not in seen
+    record = {"time": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "config": config,
+              "ready_s": ready, "nodes": probe}
+    try:
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass
+    return probe
+
+
+def describe_boot_probe(config: str, probe: dict) -> str | None:
+    """The boot-log line after 'boot ...: ready': the nodes where this was the image's first
+    boot, and the kernel-cache files the boot added per node. candidate verdicts reads it to
+    leave first boots out of time-to-ready comparisons."""
+    if not probe:
+        return None
+    first = [node for node, state in probe.items() if state.get("first_boot")]
+    compiled = {node: sum(state.get("jit_new_files", {}).values()) for node, state in probe.items()}
+    text = f"boot {Path(config).name}: "
+    text += (f"first boot of the image on {', '.join(first)}" if first else "not the image's first boot on any node")
+    text += "; kernel cache " + ", ".join(f"{node} +{count}" for node, count in compiled.items()) + " files"
+    if any(compiled.values()):
+        text += " (kernels compiled during the boot: leave its time to ready out of comparisons)"
+    return text
+
+
 def boot(config: str, dry: bool = False) -> bool:
     # A lab window restores the promoted physical fabric. It cannot undo
     # recabling or safely clean up a candidate with a different node set.
@@ -350,8 +536,13 @@ def boot(config: str, dry: bool = False) -> bool:
     ok = spark_cli("--cluster-config", config, "cluster", "start", "--replace", "--change-shape", "--apply",
                    dry=dry, capture=lines) == 0
     if not dry:
-        log(f"boot {Path(config).name}: ready +{ready_seconds(lines)} s, command {time.time() - started:.0f} s"
+        ready = ready_seconds(lines)
+        log(f"boot {Path(config).name}: ready +{ready} s, command {time.time() - started:.0f} s"
             f"{'' if ok else ' FAILED'}")
+        probe = mark_first_boots(probe_boot(config, started - 5), config, ready)
+        line = describe_boot_probe(config, probe)
+        if line:
+            log(line)
     return ok
 
 
@@ -429,9 +620,19 @@ def stop_memory_samplers(samplers: list[tuple[str, Path, subprocess.Popen]]) -> 
     return out
 
 
+OLD_ENGINE_PEAK_KIB = 2 * 1024 ** 2  # 2 GiB
+
+
 def memory_series(text: str) -> dict:
     """A node's samples through a boot, summarized in GiB: the lowest MemAvailable (the
-    startup guard's measure) and when it fell, the lowest MemFree and the largest page cache."""
+    startup guard's measure) and when it fell, the lowest MemFree and the largest page cache.
+
+    Sampling starts with the start command, while ``cluster start --replace`` still has the
+    previous engine running: its first seconds measure that engine, not the boot. The boot's
+    own figures therefore start where MemAvailable peaks, once the old engine has stopped
+    (with no old engine, the first sample; within 2 GiB of the peak, its plateau's start).
+    The samples before it are summarized apart
+    (``before_old_engine_stopped``); the raw samples are left as they are."""
     samples = []
     for line in text.splitlines():
         fields = line.split()
@@ -448,17 +649,30 @@ def memory_series(text: str) -> dict:
     def gib(kib: int) -> float:
         return round(kib / 1024**2, 3)
 
-    lowest = min(samples, key=lambda sample: sample[1])
-    return {
+    # The old engine has stopped at the first sample within OLD_ENGINE_PEAK_KIB of the peak:
+    # a boot that fails and frees its memory again may end a little higher than that plateau.
+    peak = max(sample[1] for sample in samples)
+    stopped = next(index for index, sample in enumerate(samples) if sample[1] >= peak - OLD_ENGINE_PEAK_KIB)
+    boot, before = samples[stopped:], samples[:stopped]
+    lowest = min(boot, key=lambda sample: sample[1])
+    summary = {
         "samples": len(samples),
         "seconds": round(samples[-1][0] - start, 1),
         "first": {"available_gib": gib(samples[0][1]), "free_gib": gib(samples[0][2]), "cached_gib": gib(samples[0][3])},
+        "old_engine_stopped_at_seconds": round(samples[stopped][0] - start, 1),
+        "available_after_old_engine_stopped_gib": gib(samples[stopped][1]),
+        "cached_after_old_engine_stopped_gib": gib(samples[stopped][3]),
         "min_available_gib": gib(lowest[1]),
         "min_available_at_seconds": round(lowest[0] - start, 1),
-        "min_free_gib": gib(min(sample[2] for sample in samples)),
-        "max_cached_gib": gib(max(sample[3] for sample in samples)),
+        "min_free_gib": gib(min(sample[2] for sample in boot)),
+        "max_cached_gib": gib(max(sample[3] for sample in boot)),
         "last": {"available_gib": gib(samples[-1][1]), "free_gib": gib(samples[-1][2]), "cached_gib": gib(samples[-1][3])},
     }
+    if before:
+        summary["before_old_engine_stopped"] = {"samples": len(before),
+                                                "min_available_gib": gib(min(sample[1] for sample in before)),
+                                                "min_free_gib": gib(min(sample[2] for sample in before))}
+    return summary
 
 
 def stop_arguments(remove: bool = False) -> list[str]:
@@ -824,18 +1038,97 @@ def window_open(minutes: int, note: str, dry: bool = False) -> None:
                          start_new_session=True)
 
 
-def window_close(reason: str, dry: bool = False) -> bool:
-    hold = read_hold()
-    if hold and not hold_is_ours(hold):
-        log(f"hold belongs to {hold.get('holder')!r}; leaving the cluster alone")
-        return False
-    log(f"closing window ({reason})")
-    ok = restore_production(dry=dry)
-    if not dry and ok and hold_is_ours(read_hold()):
-        HOLD.unlink()
-        log("window closed; hold removed")
-    elif not ok:
-        log("restore FAILED; hold kept so nobody assumes production is up")
+def _close_window(
+    reason: str,
+    dry: bool = False,
+    *,
+    expected_window: str | None = None,
+    stale_heartbeat: str | None = None,
+    beat_interval: float = 60.0,
+) -> tuple[bool, str]:
+    if dry:
+        hold = read_hold()
+        if hold and not hold_is_ours(hold):
+            log(f"hold belongs to {hold.get('holder')!r}; leaving the cluster alone")
+            return False, "foreign"
+        log(f"closing window ({reason})")
+        ok = restore_production(dry=True)
+        if not ok:
+            log("restore FAILED; hold kept so nobody assumes production is up")
+        return ok, "dry" if ok else "failed"
+
+    with hold_lock():
+        hold = read_hold()
+        if hold and not hold_is_ours(hold):
+            log(f"hold belongs to {hold.get('holder')!r}; leaving the cluster alone")
+            return False, "foreign"
+        if expected_window is not None and (not hold or hold.get("window") != expected_window):
+            log(f"window {expected_window} is already gone; leaving the cluster alone")
+            return True, "gone"
+        if stale_heartbeat is not None and (not hold or hold.get("heartbeat") != stale_heartbeat):
+            log("heartbeat was refreshed before close; leaving the window open")
+            return True, "refreshed"
+        window_id = hold.get("window") if hold else None
+        log(f"closing window ({reason})")
+        stop_close_beat = threading.Event()
+        close_beater: threading.Thread | None = None
+        if hold_is_ours(hold):
+            hold["closing"] = reason
+            hold["heartbeat"] = now()
+            write_json_atomic(HOLD, hold)
+
+            def close_heartbeat() -> None:
+                while not stop_close_beat.wait(beat_interval):
+                    # This thread runs only while the owning call holds hold_lock(), so it
+                    # must not re-acquire the flock; atomic replace keeps readers consistent.
+                    latest_in_close = read_hold()
+                    if hold_is_ours(latest_in_close) and (
+                        window_id is None or latest_in_close.get("window") == window_id
+                    ):
+                        latest_in_close["heartbeat"] = now()
+                        write_json_atomic(HOLD, latest_in_close)
+
+            close_beater = threading.Thread(target=close_heartbeat, daemon=True)
+            close_beater.start()
+        try:
+            ok = restore_production(dry=False)
+        finally:
+            stop_close_beat.set()
+            if close_beater is not None:
+                close_beater.join()
+
+        latest = read_hold()
+        if ok and hold_is_ours(latest) and (window_id is None or latest.get("window") == window_id):
+            HOLD.unlink(missing_ok=True)
+            log("window closed; hold removed")
+            return True, "closed"
+        if not ok:
+            if hold_is_ours(latest) and (window_id is None or latest.get("window") == window_id):
+                latest.pop("closing", None)
+                write_json_atomic(HOLD, latest)
+            log("restore FAILED; hold kept so nobody assumes production is up")
+            return False, "failed"
+        return ok, "closed"
+
+
+def window_close(
+    reason: str,
+    dry: bool = False,
+    *,
+    expected_window: str | None = None,
+    stale_heartbeat: str | None = None,
+    beat_interval: float = 60.0,
+    _outcome: dict | None = None,
+) -> bool:
+    ok, status = _close_window(
+        reason,
+        dry=dry,
+        expected_window=expected_window,
+        stale_heartbeat=stale_heartbeat,
+        beat_interval=beat_interval,
+    )
+    if _outcome is not None:
+        _outcome["status"] = status
     return ok
 
 
@@ -849,7 +1142,16 @@ def watchdog(max_age: int, once: bool) -> None:
         age = heartbeat_age(hold)
         if age > max_age:
             log(f"watchdog: heartbeat {age:.0f} s old; closing the window")
-            window_close("watchdog: stale heartbeat")
+            outcome: dict[str, str] = {}
+            window_close(
+                "watchdog: stale heartbeat",
+                expected_window=hold.get("window"),
+                stale_heartbeat=hold.get("heartbeat"),
+                _outcome=outcome,
+            )
+            if outcome.get("status") == "refreshed" and not once:
+                time.sleep(60)
+                continue
             return
         if once:
             return
@@ -929,7 +1231,7 @@ def measure_steps(spec: dict, job: dict) -> list[dict]:
             # "{label}" and "{run}" in an argument become the arm's label and the run's name.
             extra = [str(a).replace("{label}", label).replace("{run}", run) for a in extra]
             step = {"kind": "script", "label": label, "telemetry": job.get("telemetry", True),
-                    "argv": [arm_config_path(experiment, script), head_url(), *extra],
+                    "argv": [arm_config_path(experiment, script), HEAD_URL, *extra], "url_config": config,
                     "out": f"{out}/{stem}-{label}.jsonl"}
             if stem in contracts:
                 step["evidence"] = contracts[stem]
@@ -946,7 +1248,7 @@ def measure_steps(spec: dict, job: dict) -> list[dict]:
 
 
 def suite_steps(spec: dict, job: dict, arms: list[dict]) -> list[dict]:
-    """A measure job with "suite": each arm boots and runs the servebench suite through
+    """A measure job with "suite": each arm boots and runs the Sonar suite through
     bin/spark bench --suite (cooled nodes, the fan performance curve, the memory and
     temperature watch, the arm's identity in the run) into results/private/suites/<run>/<label>;
     arms after the first score the first arm's text in model steps; the table compares the
@@ -984,13 +1286,19 @@ def suite_steps(spec: dict, job: dict, arms: list[dict]) -> list[dict]:
     reference, unresolved = (recorded_reference(experiment, job["reference"], arms[0]["config"])
                              if "reference" in job else (None, None))
     for name in suites:
-        table = {"kind": "table", "argv": ["scripts/servebench_suite_table.py", run_of(name), *labels],
+        table = {"kind": "table", "argv": ["scripts/sonar_table.py", run_of(name), *labels],
                  "out": f"results/private/lab/{run_of(name)}-table.txt",
                  "curves": [f"results/private/determinism/{run}/curves-{label}.json" for label in labels]}
         if "reference" in job:
             recorded = reference if name == suites[0] or reference is None else f"{reference}-{name}"
             table["argv"][2:] = [labels[0], recorded or "?", *labels[1:]]
             table.update(reference=recorded, suite=name, arms=len(arms), unresolved=unresolved)
+            # The reference's repeat boot is found by name (<reference>-again, a companion's
+            # <reference>-again-<suite>); "reference_repeat" names it when it is called otherwise.
+            if job.get("reference_repeat"):
+                again = job["reference_repeat"] if name == suites[0] else f"{job['reference_repeat']}-{name}"
+                table["argv"][1:1] = ["--reference-repeat", again]
+                table["reference_repeat"] = again
         steps.append(table)
     return steps
 
@@ -1027,16 +1335,22 @@ def reference_problems(step: dict) -> list[str]:
     path = ROOT / step["reference"]
     if not (path / "suite.json").is_file():
         return problems + [f"reference {step['reference']} is not a suite run (no suite.json)"]
-    sys.path.insert(0, str(ROOT))
-    from servebench import suite
     try:
-        digest = suite.digest(suite.load(step["suite"]))
+        digest = sonar.module("suite").digest(sonar.load_suite(step["suite"]))
+    except sonar.SonarUnavailable as error:
+        return problems + [f"the benchmark client: {error}"]
     except (ValueError, OSError):
         return problems
     recorded = json.loads((path / "suite.json").read_text(encoding="utf-8"))["suite_sha256"]
     if recorded != digest:
         problems.append(f"reference {step['reference']} is a run of suite {step['suite']} {recorded[:12]}, "
                         f"which is now {digest[:12]}; a changed suite is a new suite: measure the reference again")
+    if step.get("reference_repeat"):
+        again = ROOT / step["reference_repeat"]
+        if not (again / "suite.json").is_file():
+            problems.append(f"reference repeat {step['reference_repeat']} is not a suite run (no suite.json)")
+        elif json.loads((again / "suite.json").read_text(encoding="utf-8"))["suite_sha256"] != recorded:
+            problems.append(f"reference repeat {step['reference_repeat']} is not a run of the reference's suite")
     return problems
 
 
@@ -1045,7 +1359,7 @@ def validate_steps(spec: dict, job: dict) -> list[dict]:
     tier = TIERS[job.get("tier", "full")]
     config = arm_config_path(experiment, job["config"])
     out = f"results/private/determinism/{job['name']}"
-    url = head_url()
+    url = HEAD_URL
     chunk = str(job.get("chunk", 4000))
     steps = [{"kind": "boot", "config": config, "label": job["name"]},
              {"kind": "fresh_inventory", "config": config},
@@ -1070,6 +1384,9 @@ def validate_steps(spec: dict, job: dict) -> list[dict]:
         steps.append({"kind": "script", "argv": restart, "out": f"{out}/scenario-runs-bootB.jsonl"})
     steps.append(stop_step(job))
     steps.append({"kind": "analyze", "out": out, "dirs": dirs, "config": config})
+    for step in steps:
+        if HEAD_URL in step.get("argv", []):
+            step["url_config"] = config
     return steps
 
 
@@ -1101,7 +1418,7 @@ def profile_steps(spec: dict, job: dict) -> list[dict]:
             script, defaults = PROFILE_WORKLOADS[workload]
             extra = job.get("workload_args", {}).get(workload, defaults)
             steps.append({"kind": "profile", "config": config, "label": arm["label"], "workload": workload,
-                          "argv": [f"{experiment}/{script}", head_url(), *extra],
+                          "argv": [f"{experiment}/{script}", HEAD_URL, *extra], "url_config": config,
                           "out": f"{out}/{arm['label']}"})
     steps.append(stop_step(job))
     steps.append({"kind": "costs", "experiment": experiment, "out": out, "workloads": workloads,
@@ -1289,14 +1606,33 @@ def agentx_problems(step: dict) -> list[str]:
     return problems
 
 
-# Lab extras that are servebench commands; their arguments are checked with its parser.
-SERVEBENCH_SHIMS = {"scripts/servebench_run.py": "run", "scripts/servebench_engine.py": "engine",
-                    "scripts/servebench_model.py": "model", "scripts/servebench_suite.py": "suite"}
+# Lab extras that are Sonar commands (spark_ds41f/sonar.py); their arguments are checked with
+# Sonar's parser, as each shim will pass them.
+SONAR_SHIMS = {"scripts/sonar_run.py": "run", "scripts/sonar_engine.py": "engine",
+               "scripts/sonar_model.py": "model", "scripts/sonar_suite.py": "suite",
+               "scripts/sonar_determinism.py": "determinism", "scripts/sonar_single.py": "single",
+               "scripts/sonar_ttft.py": "ttft", "scripts/sonar_mixed.py": "mixed",
+               "scripts/distinct_streams.py": "streams", "scripts/acceptance_sweep.py": "acceptance"}
+
+
+def sonar_parse(command: str, args: list[str]):
+    """Parse a shim's arguments as Sonar will, and for a suite every step's too."""
+    main = sonar.module("sonar.__main__")
+    if command == "suite":
+        args = sonar.suite_arguments(args)
+    elif command == "mixed":
+        args = sonar.mixed_arguments(args)
+    parsed = main.build_parser().parse_args([command, *args])
+    if command == "suite":
+        suite = sonar.module("suite")
+        for suite_step in suite.load(parsed.suite)["steps"]:
+            main.build_parser().parse_args(suite.arguments(suite_step, parsed.url, "o.json", "l", parsed.corpus))
+    return parsed
 
 
 def plan_problems(steps: list[dict]) -> list[str]:
     """What would fail only after a boot: a missing arm configuration or script, or
-    servebench arguments its parser rejects."""
+    Sonar arguments its parser rejects."""
     problems = []
     for step in steps:
         if step["kind"] in ("boot", "image", "fabric"):
@@ -1325,20 +1661,15 @@ def plan_problems(steps: list[dict]) -> list[str]:
                 problems.append(f"{step['out']}: prior required evidence exists; use a distinct run")
         if not (ROOT / script).is_file():
             problems.append(f"script {script} does not exist")
-        elif script in SERVEBENCH_SHIMS:
-            sys.path.insert(0, str(ROOT))
-            from servebench.__main__ import build_parser
+        elif script in SONAR_SHIMS:
             errors = io.StringIO()
             try:
                 with contextlib.redirect_stderr(errors):
-                    parsed = build_parser().parse_args([SERVEBENCH_SHIMS[script], *args])
-                    if SERVEBENCH_SHIMS[script] == "suite":
-                        # Every step of the suite, as the suite will run it.
-                        from servebench import suite
-                        for suite_step in suite.load(parsed.suite)["steps"]:
-                            build_parser().parse_args(suite.arguments(suite_step, parsed.url, "o.json", "l", parsed.corpus))
+                    sonar_parse(SONAR_SHIMS[script], args)
             except SystemExit:
                 problems.append(f"{script} {shlex.join(args[1:])}: {errors.getvalue().strip().splitlines()[-1]}")
+            except sonar.SonarUnavailable as error:
+                problems.append(f"{script}: the benchmark client: {error}")
             except (ValueError, OSError) as error:
                 problems.append(f"{script} {shlex.join(args[1:])}: {error}")
     return list(dict.fromkeys(problems))
@@ -1353,15 +1684,17 @@ def arm_problems(config: str) -> list[str]:
 
 
 def suite_problems(step: dict) -> list[str]:
-    """A bench --suite step: the suite and every step's servebench arguments parse, and a
+    """A bench --suite step: the suite and every step's Sonar arguments parse, and a
     suite that times the engine grid runs on an arm with the dev-mode collective RPC."""
-    sys.path.insert(0, str(ROOT))
-    from servebench import suite
-    from servebench.__main__ import build_parser
     config = step["argv"][step["argv"].index("--cluster-config") + 1]
     errors = io.StringIO()
     try:
-        definition = suite.load(step["suite"])
+        suite = sonar.module("suite")
+        build_parser = sonar.module("sonar.__main__").build_parser
+    except sonar.SonarUnavailable as error:
+        return [f"suite {step['suite']}: the benchmark client: {error}"]
+    try:
+        definition = sonar.load_suite(step["suite"])
         with contextlib.redirect_stderr(errors):
             for suite_step in definition["steps"]:
                 build_parser().parse_args(suite.arguments(suite_step, "http://head:8000", "o.json", "l", None))
@@ -1443,7 +1776,7 @@ def run_script(step: dict) -> int:
     if declared and evidence_out.exists():
         raise FileExistsError(f"prior evidence exists: {evidence_out}")
     with out.open("x" if declared else "w") as handle:
-        code = subprocess.run([sys.executable, *step["argv"]], cwd=ROOT, stdout=handle,
+        code = subprocess.run([sys.executable, *step_argv(step)], cwd=ROOT, stdout=handle,
                               stderr=subprocess.STDOUT).returncode
     if not declared:
         return code
@@ -1530,7 +1863,7 @@ def profile_workload(step: dict) -> None:
     each(lambda node: in_container(node, f"mkdir -p {container_dir} && rm -rf {container_dir}/*.json.gz "
                                          f"{container_dir}/{workload}"))
     with (out / f"{workload}.json").open("w") as handle:
-        code = subprocess.run([sys.executable, *step["argv"]], cwd=ROOT, stdout=handle,
+        code = subprocess.run([sys.executable, *step_argv(step)], cwd=ROOT, stdout=handle,
                               stderr=subprocess.STDOUT).returncode
     log(f"profile {step['label']} {workload} exit {code}")
     if code:
@@ -1927,6 +2260,8 @@ def execute(spec: dict, dry: bool, keep_open: bool, close_on_failure: bool = Tru
     hold = read_hold()
     if not hold_is_ours(hold):
         window_open(spec.get("minutes", DEFAULT_MINUTES), f"run {spec['run']}")
+        hold = read_hold()
+    window_id = hold.get("window") if hold_is_ours(hold) else None
     checked = set()
     failed = None
     window_ending = None  # a reason the window itself must close, not just this run
@@ -1938,11 +2273,15 @@ def execute(spec: dict, dry: bool, keep_open: bool, close_on_failure: bool = Tru
         # catches a dead runner; a hung step is for whoever watches the run (or a cap).
         while not stop_beating.wait(60):
             try:
-                beat(current["note"])
+                if window_id is None:
+                    beat(current["note"])
+                else:
+                    beat(current["note"], expected_window=window_id)
             except SystemExit:
                 return
 
-    threading.Thread(target=heartbeat, daemon=True).start()
+    beater = threading.Thread(target=heartbeat, daemon=True)
+    beater.start()
     validated = False
     restart = False
     booted = None  # the arm serving now: its container is the one sampled and whose logs are kept
@@ -1957,9 +2296,12 @@ def execute(spec: dict, dry: bool, keep_open: bool, close_on_failure: bool = Tru
             failed = window_ending = reason
             break
         current["note"] = describe_step(step)
-        beat(current["note"])
+        if window_id is None:
+            beat(current["note"])
+        else:
+            beat(current["note"], expected_window=window_id)
         if step["kind"] != "sync" and not validated:
-            # After any sync, before the first boot: every file and servebench argument
+            # After any sync, before the first boot: every file and Sonar argument
             # the run needs, so a mistake costs seconds rather than a boot.
             validated = True
             problems = plan_problems(steps)
@@ -1994,7 +2336,9 @@ def execute(spec: dict, dry: bool, keep_open: bool, close_on_failure: bool = Tru
                         write_json_atomic(ROOT / step["startup_memory_out"], startup)
                         for name, summary in startup.items():
                             log(f"{name}: lowest MemAvailable {summary.get('min_available_gib')} GiB during the boot, "
-                                f"page cache up to {summary.get('max_cached_gib')} GiB")
+                                f"page cache up to {summary.get('max_cached_gib')} GiB"
+                                + (f" (from the old engine's stop at +{summary['old_engine_stopped_at_seconds']} s)"
+                                   if summary.get("before_old_engine_stopped") else ""))
                 if not started:
                     failed = f"boot of {step['config']} failed"
                     # A boot that dies keeps its evidence: the next boot replaces the containers.
@@ -2089,7 +2433,7 @@ def execute(spec: dict, dry: bool, keep_open: bool, close_on_failure: bool = Tru
             elif step["kind"] == "fresh_inventory":
                 fresh_inventory(step.get("config"))
             elif step["kind"] == "stop":
-                if container_running() and not stop_cluster(remove=step.get("remove", False)):
+                if (step.get("remove") or container_running()) and not stop_cluster(remove=step.get("remove", False)):
                     failed = "stop failed"
                     break
             elif step["kind"] == "analyze":
@@ -2118,6 +2462,7 @@ def execute(spec: dict, dry: bool, keep_open: bool, close_on_failure: bool = Tru
             failed = f"{describe_step(step)} raised {type(error).__name__}: {error}"
             break
     stop_beating.set()
+    beater.join()
     if failed_points and not failed:
         failed = f"agentx points failed: {', '.join(failed_points)}"
     if restart:
