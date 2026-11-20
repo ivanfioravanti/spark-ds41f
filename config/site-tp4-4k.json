@@ -1,5 +1,5 @@
 {
-  "notes": "Site profile: the recipe at tp4-ring on the stock 4 KiB kernel (7.0.0-1025-nvidia, no memory saver), with control traffic on the ring0 node addresses (10.10.100.x) because the nodes have no wired management network. Start it with --unqualified-shape. The GLP steering block is unset (its repository is gated). It uses the promoted upstream lock: the 1120 patch heads reproduce on this host.",
+  "notes": "Site profile: the recipe at tp4-ring on the stock 4 KiB kernel (7.0.0-1025-nvidia, no memory saver), with control traffic on the ring0 node addresses (10.10.100.x) because the nodes have no wired management network. Start it with --unqualified-shape. It serves 16 concurrent sequences (CUDA graphs up to 96 rows, long-prefill threshold 16384-96) instead of the recipe's 32, keeping the recipe's 16.5 GiB KV pool. The GLP steering block is unset (its repository is gated). It uses the promoted upstream lock: the 1120 patch heads reproduce on this host.",
   "extends": {
     "config": "config/cluster.json",
     "shape": "tp4-ring"
@@ -25,6 +25,12 @@
     "distributed": {
       "master_addr": "10.10.100.1"
     }
+  },
+  "serve_options": {
+    "--max-num-seqs": "16",
+    "--max-cudagraph-capture-size": "96",
+    "--compilation-config": "{\"cudagraph_mode\":\"FULL_AND_PIECEWISE\",\"custom_ops\":[\"all\"],\"cudagraph_capture_sizes\":[1,2,3,4,6,8,12,16,20,24,28,32,40,48,56,64,72,80,88,96]}",
+    "--long-prefill-token-threshold": "16288"
   },
   "unset": [
     "glp"
