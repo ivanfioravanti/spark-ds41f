@@ -1,5 +1,5 @@
 {
-  "notes": "Site profile: the recipe at tp4-ring on the stock 4 KiB kernel (7.0.0-1025-nvidia, no memory saver), with control traffic on the ring0 node addresses (10.10.100.x) because the nodes have no wired management network. Start it with --unqualified-shape. The GLP steering block is unset (its repository is gated). It uses the promoted upstream lock: the 1126 patch heads reproduce on this host.",
+  "notes": "Site profile: the recipe at tp4-ring on the stock 4 KiB kernel (7.0.0-1025-nvidia, no memory saver), with control traffic on the ring0 node addresses (10.10.100.x) because the nodes have no wired management network. Start it with --unqualified-shape. It keeps the recipe's GLP block: the steered name deepseek-v4.1-flash-weightless is served beside the stock name on nodes holding the pinned vector (its repository is gated; accept its agreement on the downloading account). It uses the promoted upstream lock: the 1126 patch heads reproduce on this host.",
   "extends": {
     "config": "config/cluster.json",
     "shape": "tp4-ring"
@@ -25,8 +25,5 @@
     "distributed": {
       "master_addr": "10.10.100.1"
     }
-  },
-  "unset": [
-    "glp"
-  ]
+  }
 }
